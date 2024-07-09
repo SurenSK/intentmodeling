@@ -1,14 +1,25 @@
-from flask import Flask, render_template, request, redirect, url_for, session
-import json
-import os
-import hashlib
 import random
+from flask import Flask, render_template, request, redirect, url_for
+import json
+import hashlib
 
 app = Flask(__name__)
 app.secret_key = 'key'
+
+# In-memory storage
+responses = {}
+i_samples = []
+q_samples = []
+
+def get_user_hash():
+    user_data = f"{request.remote_addr}{request.user_agent.string}"
+    return hashlib.md5(user_data.encode()).hexdigest()
+
 def load_samples():
+    global i_samples, q_samples
     i_samples = []
     q_samples = []
+    
     try:
         with open('ga_output.jsonl', 'r') as file:
             for line in file:
@@ -42,24 +53,10 @@ def load_samples():
 
     random.shuffle(i_samples)
     random.shuffle(q_samples)
-    return i_samples, q_samples
 
-def load_responses():
-    if os.path.exists('survey_responses.json'):
-        with open('survey_responses.json', 'r') as f:
-            return json.load(f)
-    return {}
+# Call this function at startup
+load_samples()
 
-def save_responses(responses):
-    with open('survey_responses.json', 'w') as f:
-        json.dump(responses, f)
-
-def get_user_hash():
-    user_data = f"{request.remote_addr}{request.user_agent.string}"
-    return hashlib.md5(user_data.encode()).hexdigest()
-
-i_samples, q_samples = load_samples()
-responses = load_responses()
 @app.route('/')
 def index():
     user_hash = get_user_hash()
@@ -84,23 +81,35 @@ def index():
                                total_sets=len(i_samples) + len(q_samples),
                                responses=responses[user_hash]['answers'],
                                is_individual=False)
-    
-@app.route('/rate', methods=['POST'])
+
+def append_to_output_file(user_hash, index, response):
+    with open('survey_responses.jsonl', 'a') as f:
+        output = {
+            'user_hash': user_hash,
+            'index': index,
+            'response': response
+        }
+        json.dump(output, f)
+        f.write('\n')
+
 @app.route('/rate', methods=['POST'])
 def rate():
     user_hash = get_user_hash()
     
-    # Ensure user data is initialized
     if user_hash not in responses:
         responses[user_hash] = {'current_set_index': 0, 'answers': {}}
 
     current_index = responses[user_hash]['current_set_index']
     
     # Save current ratings
-    responses[user_hash]['answers'][current_index] = {
+    current_response = {
         'relevance': request.form.get('relevance'),
         'completeness': request.form.get('completeness')
     }
+    responses[user_hash]['answers'][current_index] = current_response
+
+    # Append the response to the output file
+    append_to_output_file(user_hash, current_index, current_response)
 
     # Navigation logic (Next/Previous)
     total_samples = len(i_samples) + len(q_samples)
@@ -108,9 +117,6 @@ def rate():
         responses[user_hash]['current_set_index'] += 1
     elif 'previous' in request.form and current_index > 0:
         responses[user_hash]['current_set_index'] -= 1
-
-    # Save responses to a file
-    save_responses(responses)
 
     return redirect(url_for('index'))
 
