@@ -5,22 +5,47 @@ import hashlib
 
 app = Flask(__name__)
 app.secret_key = 'key'
+import json
+import random
 
 def load_samples():
-    samples = []
+    i_samples = []
+    q_samples = []
     try:
         with open('ga_output.jsonl', 'r') as file:
             for line in file:
-                samples.append(json.loads(line))
+                try:
+                    sample = json.loads(line)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON: {e}")
+                    continue  # Skip this line but continue processing
+
+                if sample.get('survey', False):
+                    q_samples.append(sample)
+                    for i in range(1, 6):
+                        question_key = f'question{i}'
+                        if question_key in sample:
+                            new_sample = {
+                                'gen#': sample['gen#'],
+                                'prompt#': sample['prompt#'],
+                                'score': sample['score'],
+                                'valid': sample['valid'],
+                                'prompt': sample['prompt'],
+                                'question': sample[question_key]
+                            }
+                            i_samples.append(new_sample)
+
     except FileNotFoundError:
         print("ga_output.jsonl file not found")
-        raise
-    except json.JSONDecodeError as e:
-        print(f"Error decoding JSONL: {e}")
         raise
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         raise
+
+    # Randomize order of samples
+    random.shuffle(i_samples)
+    random.shuffle(q_samples)
+    samples = i_samples + q_samples
     return samples
 
 def load_responses():
