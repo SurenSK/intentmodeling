@@ -5,7 +5,6 @@ import hashlib
 
 app = Flask(__name__)
 app.secret_key = 'key'
-# 
 
 def load_samples():
     samples = []
@@ -62,6 +61,11 @@ def index():
 @app.route('/rate', methods=['POST'])
 def rate():
     user_hash = get_user_hash()
+    
+    # Ensure user data is initialized
+    if user_hash not in responses:
+        responses[user_hash] = {'current_set_index': 0, 'answers': {}}
+
     current_index = responses[user_hash]['current_set_index']
     
     # Save current ratings
