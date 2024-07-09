@@ -2,11 +2,10 @@ from flask import Flask, render_template, request, redirect, url_for, session
 import json
 import os
 import hashlib
+import random
 
 app = Flask(__name__)
 app.secret_key = 'key'
-import json
-import random
 
 def load_samples():
     i_samples = []
@@ -18,7 +17,7 @@ def load_samples():
                     sample = json.loads(line)
                 except json.JSONDecodeError as e:
                     print(f"Error decoding JSON: {e}")
-                    continue  # Skip this line but continue processing
+                    continue
 
                 if sample.get('survey', False):
                     q_samples.append(sample)
@@ -42,7 +41,6 @@ def load_samples():
         print(f"An unexpected error occurred: {e}")
         raise
 
-    # Randomize order of samples
     random.shuffle(i_samples)
     random.shuffle(q_samples)
     samples = i_samples + q_samples
@@ -68,18 +66,16 @@ responses = load_responses()
 @app.route('/')
 def index():
     user_hash = get_user_hash()
-    if user_hash not in responses:
-        responses[user_hash] = {'current_set_index': 0, 'answers': {}}
-    
-    current_set_index = responses[user_hash]['current_set_index']
+    # Always start from the beginning
+    responses[user_hash] = {'current_set_index': 0, 'answers': {}}
     
     if samples:
-        current_set = samples[current_set_index]
+        current_set = samples[0]  # Always start with the first sample
         return render_template('index.html', 
                                sample_set=current_set, 
-                               set_index=current_set_index + 1, 
+                               set_index=1,  # Always start at 1 
                                total_sets=len(samples),
-                               responses=responses[user_hash]['answers'])
+                               responses={})  # Empty responses as we're starting fresh
     else:
         return "Error loading samples", 500
 
