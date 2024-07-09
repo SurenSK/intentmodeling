@@ -6,7 +6,6 @@ import random
 
 app = Flask(__name__)
 app.secret_key = 'key'
-
 def load_samples():
     i_samples = []
     q_samples = []
@@ -43,8 +42,7 @@ def load_samples():
 
     random.shuffle(i_samples)
     random.shuffle(q_samples)
-    samples = i_samples + q_samples
-    return samples
+    return i_samples, q_samples
 
 def load_responses():
     if os.path.exists('survey_responses.json'):
@@ -60,25 +58,34 @@ def get_user_hash():
     user_data = f"{request.remote_addr}{request.user_agent.string}"
     return hashlib.md5(user_data.encode()).hexdigest()
 
-samples = load_samples()
+i_samples, q_samples = load_samples()
 responses = load_responses()
-
 @app.route('/')
 def index():
     user_hash = get_user_hash()
-    # Always start from the beginning
-    responses[user_hash] = {'current_set_index': 0, 'answers': {}}
-    
-    if samples:
-        current_set = samples[0]  # Always start with the first sample
-        return render_template('index.html', 
-                               sample_set=current_set, 
-                               set_index=1,  # Always start at 1 
-                               total_sets=len(samples),
-                               responses={})  # Empty responses as we're starting fresh
-    else:
-        return "Error loading samples", 500
+    if user_hash not in responses:
+        responses[user_hash] = {'current_set_index': 0, 'answers': {}}
 
+    current_index = responses[user_hash]['current_set_index']
+
+    if current_index < len(i_samples):
+        current_set = i_samples[current_index]
+        return render_template('index.html',
+                               sample_set=current_set,
+                               set_index=current_index + 1,
+                               total_sets=len(i_samples) + len(q_samples),
+                               responses=responses[user_hash]['answers'],
+                               is_individual=True)
+    else:
+        current_set = q_samples[current_index - len(i_samples)]
+        return render_template('index.html',
+                               sample_set=current_set,
+                               set_index=current_index + 1,
+                               total_sets=len(i_samples) + len(q_samples),
+                               responses=responses[user_hash]['answers'],
+                               is_individual=False)
+    
+@app.route('/rate', methods=['POST'])
 @app.route('/rate', methods=['POST'])
 def rate():
     user_hash = get_user_hash()
@@ -96,7 +103,8 @@ def rate():
     }
 
     # Navigation logic (Next/Previous)
-    if 'next' in request.form and current_index < len(samples) - 1:
+    total_samples = len(i_samples) + len(q_samples)
+    if 'next' in request.form and current_index < total_samples - 1:
         responses[user_hash]['current_set_index'] += 1
     elif 'previous' in request.form and current_index > 0:
         responses[user_hash]['current_set_index'] -= 1
