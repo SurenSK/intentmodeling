@@ -67,14 +67,14 @@ def load_samples():
     i_samples.insert(0, {
         'gen#': 'info',
         'prompt#': 'intro1',
-        'question': 'Welcome to Part 1 of the survey. In this part, you will be evaluating individual questions. Evaluate each question as if it was from an entirely seperate author, without the context of the rest of the survey.',
+        'question': 'Welcome to Part 1 of the survey. In this part, you will be evaluating individual questions. Evaluate each question as if it were from an entirely separate author, without the context of the rest of the survey.',
         'is_info': True
     })
     
     q_samples.insert(0, {
         'gen#': 'info',
         'prompt#': 'intro2',
-        'question1': 'Welcome to Part 2 of the survey. In this part, you will be evaluating sets of questions jointly. Evaluate each question set as if it was from an entirely seperate author, without the context of the rest of the survey.',
+        'question': 'Welcome to Part 2 of the survey. In this part, you will be evaluating sets of questions jointly. Evaluate each set of questions as if it were from an entirely separate author, without the context of the rest of the survey.',
         'is_info': True
     })
 
