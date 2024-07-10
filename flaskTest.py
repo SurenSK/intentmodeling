@@ -57,7 +57,6 @@ def index():
     user_hash = get_user_hash()
     if 'user_data' not in session:
         session['user_data'] = {'current_set_index': 0, 'answers': {}}
-
     current_index = session['user_data']['current_set_index']
 
     if current_index < len(i_samples):
@@ -106,6 +105,7 @@ def append_to_output_file(user_hash, index, response):
         }
         json.dump(output, f)
         f.write('\n')
+
 @app.route('/rate', methods=['POST'])
 def rate():
     user_hash = get_user_hash()
@@ -135,6 +135,11 @@ def rate():
         session['user_data']['current_set_index'] = len(i_samples)
 
     session.modified = True  # Ensure the session is saved
+    return redirect(url_for('index'))
+
+@app.route('/reset')
+def reset():
+    session.clear()  # This will clear all session data
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
