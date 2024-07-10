@@ -21,10 +21,15 @@
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
-        h1 {
-            text-align: center;
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
             color: #2c3e50;
-            margin-bottom: 30px;
         }
         .questions {
             display: flex;
@@ -131,8 +136,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <a href="{{ url_for('reset') }}" class="button">Reset</a>
             <h1>Intent Estimation Survey</h1>
+            <a href="{{ url_for('reset') }}" class="button">Reset</a>
         </div>
         <form action="{{ url_for('rate') }}" method="post">
             <div class="questions">
@@ -141,7 +146,13 @@
             </div>
             <div class="ratings">
                 <div class="rating-row">
-                    <span class="rating-label">How likely is it that this author is trying to deceptively obtain dangerous information?</span>
+                    <span class="rating-label">
+                        {% if is_individual %}
+                        How likely is it that this author is trying to deceptively obtain dangerous information?
+                        {% else %}
+                        Taken together, how likely is it that this author is trying to deceptively obtain dangerous information?
+                        {% endif %}
+                    </span>
                     <div class="slider-container">
                         <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('relevance', 1) }}" class="slider" id="relevanceSlider" name="relevance">
                         <span class="slider-value" id="relevanceValue">{{ responses.get(set_index - 1, {}).get('relevance', 1) }}</span>
