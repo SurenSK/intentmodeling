@@ -67,7 +67,8 @@ def index():
                                set_index=current_index + 1,
                                total_sets=len(i_samples) + len(q_samples),
                                responses=session['user_data']['answers'],
-                               is_individual=True)
+                               is_individual=True,
+                               i_samples_length=len(i_samples))
     else:
         current_set = q_samples[current_index - len(i_samples)]
         return render_template('index.html',
@@ -75,7 +76,8 @@ def index():
                                set_index=current_index + 1,
                                total_sets=len(i_samples) + len(q_samples),
                                responses=session['user_data']['answers'],
-                               is_individual=False)
+                               is_individual=False,
+                               i_samples_length=len(i_samples))
 
 def get_est_time():
     utc_time = datetime.now(timezone.utc)
@@ -104,7 +106,6 @@ def append_to_output_file(user_hash, index, response):
         }
         json.dump(output, f)
         f.write('\n')
-
 @app.route('/rate', methods=['POST'])
 def rate():
     user_hash = get_user_hash()
@@ -124,12 +125,14 @@ def rate():
     # Append the response to the output file
     append_to_output_file(user_hash, current_index, current_response)
 
-    # Navigation logic (Next/Previous)
+    # Navigation logic (Next/Previous/Skip Stage 1)
     total_samples = len(i_samples) + len(q_samples)
     if 'next' in request.form and current_index < total_samples - 1:
         session['user_data']['current_set_index'] += 1
     elif 'previous' in request.form and current_index > 0:
         session['user_data']['current_set_index'] -= 1
+    elif 'skip_stage_1' in request.form and current_index < len(i_samples):
+        session['user_data']['current_set_index'] = len(i_samples)
 
     session.modified = True  # Ensure the session is saved
     return redirect(url_for('index'))
