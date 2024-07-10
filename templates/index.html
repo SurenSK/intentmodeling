@@ -130,7 +130,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Text Rating Application</h1>
+        <h1>Intent Estimation Survey</h1>
         <form action="{{ url_for('rate') }}" method="post">
             <div class="questions">
                 <textarea readonly>{% if is_individual %}{{ sample_set['question'] }}{% else %}{% for i in range(1, 6) %}{{ i }}. {{ sample_set['question' ~ i] | trim | replace('\n', ' ') | replace('\r', '') }}
