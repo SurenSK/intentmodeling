@@ -46,6 +46,16 @@
             font-size: 16px;
             line-height: 1.5;
             overflow-y: auto;
+            /* Add these properties to make the text unhighlightable */
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            cursor: default;
+        }
+        .questions textarea:focus {
+            color: inherit;
+            outline: none;
         }
         .ratings {
             margin-bottom: 30px;
