@@ -38,7 +38,6 @@ def load_samples():
                             }
                             i_samples.append(new_sample)
 
-        # Load sample counts from a separate file
         try:
             with open('sample_counts.json', 'r') as count_file:
                 sample_counts = json.load(count_file)
@@ -52,29 +51,22 @@ def load_samples():
         print(f"An unexpected error occurred: {e}")
         raise
 
-    # Sort i_samples based on their count (least sampled first)
     i_samples.sort(key=lambda x: sample_counts.get(f"{x['gen#']}_{x['prompt#']}_{x['question_number']}", 0))
-    
-    # Take only the first 100 least sampled i_samples
     i_samples = i_samples[:100]
-
-    # Shuffle the 100 least sampled i_samples
     random.shuffle(i_samples)
-
     random.shuffle(q_samples)
 
-    # Now add the info screens
     i_samples.insert(0, {
         'gen#': 'info',
         'prompt#': 'intro1',
-        'question': 'Welcome to Part 1 of the survey. In this part, you will be evaluating individual questions. Evaluate each question as if it were from an entirely separate author, without the context of the rest of the survey.',
+        'question1': 'Welcome to Part 1 of the survey. In this part, you will be evaluating individual questions. Evaluate each question as if it were from an entirely separate author, without the context of the rest of the survey.',
         'is_info': True
     })
     
     q_samples.insert(0, {
         'gen#': 'info',
         'prompt#': 'intro2',
-        'question': 'Welcome to Part 2 of the survey. In this part, you will be evaluating sets of questions jointly. Evaluate each set of questions as if it were from an entirely separate author, without the context of the rest of the survey.',
+        'question1': 'Welcome to Part 2 of the survey. In this part, you will be evaluating sets of questions jointly. Evaluate each set of questions as if it were from an entirely separate author, without the context of the rest of the survey.',
         'is_info': True
     })
 
@@ -116,6 +108,7 @@ def append_to_output_file(user_hash, index, response):
         output = {
             'date-time': current_time,
             'user_hash': user_hash,
+            'name': session['user_data'].get('name', ''),  # Add this line
             'gen#': sample['gen#'],
             'prompt#': sample['prompt#'],
             'question#': question_num,
@@ -125,11 +118,9 @@ def append_to_output_file(user_hash, index, response):
         json.dump(output, f)
         f.write('\n')
 
-    # Update sample counts
     sample_key = f"{sample['gen#']}_{sample['prompt#']}_{question_num}"
     sample_counts[sample_key] = sample_counts.get(sample_key, 0) + 1
 
-    # Save updated sample counts
     with open('sample_counts.json', 'w') as count_file:
         json.dump(sample_counts, count_file)
 
@@ -137,7 +128,7 @@ def append_to_output_file(user_hash, index, response):
 def index():
     user_hash = get_user_hash()
     if 'user_data' not in session:
-        session['user_data'] = {'current_set_index': 0, 'answers': {}}
+        session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
     current_index = session['user_data']['current_set_index']
 
     total_samples = len(i_samples) + len(q_samples)
@@ -152,7 +143,14 @@ def index():
         current_set = q_samples[current_index - len(i_samples)]
         is_individual = False
 
-    is_part_1 = current_index < len(i_samples)  # Add this line
+    is_part_1 = current_index < len(i_samples)
+
+    # Fix for both Part 1 and Part 2 intro screens
+    if current_set.get('is_info', False):
+        if 'question1' in current_set:
+            current_set['question'] = current_set['question1']
+        elif 'question' not in current_set:
+            current_set['question'] = current_set.get('question', "Welcome to the survey.")
 
     return render_template('index.html',
                            sample_set=current_set,
@@ -161,17 +159,26 @@ def index():
                            responses=session['user_data']['answers'],
                            is_individual=is_individual,
                            i_samples_length=len(i_samples),
-                           is_part_1=is_part_1)  # Add this line
+                           is_part_1=is_part_1,
+                           user_name=session['user_data'].get('name', ''))
+
+
+@app.route('/update_name', methods=['POST'])
+def update_name():
+    data = request.get_json()
+    session['user_data']['name'] = data.get('name', '')
+    session.modified = True
+    return '', 204  # Return an empty response with a 204 No Content status
+
 @app.route('/rate', methods=['POST'])
 def rate():
     user_hash = get_user_hash()
     
     if 'user_data' not in session:
-        session['user_data'] = {'current_set_index': 0, 'answers': {}}
+        session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
 
     current_index = session['user_data']['current_set_index']
     
-    # Save current ratings only if it's not an info screen
     current_sample = i_samples[current_index] if current_index < len(i_samples) else q_samples[current_index - len(i_samples)]
     if not current_sample.get('is_info', False):
         current_response = {
@@ -180,10 +187,8 @@ def rate():
         }
         session['user_data']['answers'][str(current_index)] = current_response
 
-        # Append the response to the output file
         append_to_output_file(user_hash, current_index, current_response)
 
-    # Navigation logic (Next/Previous/Skip Stage 1)
     total_samples = len(i_samples) + len(q_samples)
     if 'next' in request.form and current_index < total_samples - 1:
         session['user_data']['current_set_index'] += 1
@@ -192,15 +197,14 @@ def rate():
     elif 'skip_stage_1' in request.form:
         session['user_data']['current_set_index'] = len(i_samples)
 
-    # Ensure the index doesn't go out of bounds
     session['user_data']['current_set_index'] = min(session['user_data']['current_set_index'], total_samples - 1)
 
-    session.modified = True  # Ensure the session is saved
+    session.modified = True
     return redirect(url_for('index'))
 
 @app.route('/reset')
 def reset():
-    session.clear()  # This will clear all session data
+    session.clear()
     return redirect(url_for('index'))
 
 if __name__ == '__main__':

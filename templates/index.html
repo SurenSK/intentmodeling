@@ -27,9 +27,26 @@
             align-items: center;
             margin-bottom: 20px;
         }
-        .header h1 {
-            margin: 0;
-            color: #2c3e50;
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .name-input {
+            margin: 0 auto;
+            flex-grow: 0;
+            flex-shrink: 0;
+            width: 200px; /* Adjust this value as needed */
+        }
+
+        .name-input input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
         .questions {
             display: flex;
@@ -46,7 +63,6 @@
             font-size: 16px;
             line-height: 1.5;
             overflow-y: auto;
-            /* Add these properties to make the text unhighlightable */
             user-select: none;
             -webkit-user-select: none;
             -moz-user-select: none;
@@ -187,6 +203,9 @@
     <div class="container">
         <div class="header">
             <h1>Intent Estimation Survey</h1>
+            <div class="name-input">
+                <input type="text" id="userName" name="userName" placeholder="Enter your name" value="{{ user_name }}" oninput="updateName(this.value)">
+            </div>
             <a href="{{ url_for('reset') }}" class="button">Reset</a>
         </div>
         <form action="{{ url_for('rate') }}" method="post">
@@ -284,6 +303,16 @@
 
         updateSliderValue('relevanceSlider', 'relevanceValue');
         updateSliderValue('completenessSlider', 'completenessValue');
+
+        function updateName(name) {
+            fetch('/update_name', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({name: name})
+            });
+        }
     </script>
 </body>
 </html>
