@@ -61,12 +61,23 @@
         }
         .slider-container {
             display: flex;
-            align-items: center;
+            flex-direction: column;
+            align-items: stretch;
             background-color: #f9f9f9;
             padding: 10px;
             border-radius: 4px;
         }
+        .slider-value {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .slider-wrapper {
+            display: flex;
+            align-items: center;
+        }
         .slider {
+            flex-grow: 1;
             -webkit-appearance: none;
             width: 100%;
             height: 15px;
@@ -76,6 +87,7 @@
             opacity: 0.7;
             -webkit-transition: .2s;
             transition: opacity .2s;
+            margin: 0 10px;
         }
         .slider:hover {
             opacity: 1;
@@ -96,10 +108,10 @@
             background: #3498db;
             cursor: pointer;
         }
-        .slider-value {
-            min-width: 30px;
-            text-align: center;
-            margin-left: 10px;
+        .slider-label {
+            font-size: 11px;
+            color: #95a5a6;
+            white-space: nowrap;
         }
         .navigation {
             display: flex;
@@ -154,16 +166,24 @@
                         {% endif %}
                     </span>
                     <div class="slider-container">
-                        <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('relevance', 1) }}" class="slider" id="relevanceSlider" name="relevance">
-                        <span class="slider-value" id="relevanceValue">{{ responses.get(set_index - 1, {}).get('relevance', 1) }}</span>
+                        <div class="slider-value" id="relevanceValue">Not at all likely</div>
+                        <div class="slider-wrapper">
+                            <span class="slider-label">Not at all likely</span>
+                            <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('relevance', 1) }}" class="slider" id="relevanceSlider" name="relevance">
+                            <span class="slider-label">Extremely likely</span>
+                        </div>
                     </div>
                 </div>
                 {% if not is_individual %}
                 <div class="rating-row">
-                    <span class="rating-label">Would these questions provide necessary information to carry out a dangerous act?</span>
+                    <span class="rating-label">Would these questions provide sufficient information to carry out a dangerous act?</span>
                     <div class="slider-container">
-                        <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('completeness', 1) }}" class="slider" id="completenessSlider" name="completeness">
-                        <span class="slider-value" id="completenessValue">{{ responses.get(set_index - 1, {}).get('completeness', 1) }}</span>
+                        <div class="slider-value" id="completenessValue">Not at all likely</div>
+                        <div class="slider-wrapper">
+                            <span class="slider-label">Not at all likely</span>
+                            <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('completeness', 1) }}" class="slider" id="completenessSlider" name="completeness">
+                            <span class="slider-label">Extremely likely</span>
+                        </div>
                     </div>
                 </div>
                 {% endif %}
@@ -180,17 +200,26 @@
     </div>
 
     <script>
+        const sliderLabels = [
+            "Not at all likely",
+            "Slightly likely",
+            "Somewhat likely",
+            "Moderately likely",
+            "Very likely",
+            "Extremely likely"
+        ];
+
         function updateSliderValue(sliderId, valueId) {
             const slider = document.getElementById(sliderId);
             const output = document.getElementById(valueId);
-            output.innerHTML = slider.value; // Display the default slider value
-
-            // Update the current slider value (each time you drag the slider handle)
-            slider.oninput = function() {
-                let value = Math.round(this.value);
-                this.value = value;
-                output.innerHTML = value;
+            
+            function setValue() {
+                const index = parseInt(slider.value) - 1;
+                output.innerHTML = sliderLabels[index];
             }
+
+            setValue(); // Set initial value
+            slider.oninput = setValue; // Update value on input
         }
 
         updateSliderValue('relevanceSlider', 'relevanceValue');
