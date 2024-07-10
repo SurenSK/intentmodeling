@@ -84,10 +84,8 @@ def index():
 
 from datetime import datetime, timedelta
 def get_est_time():
-    # Get current UTC time and subtract 5 hours for EST
-    # Note: This doesn't account for daylight saving time
     utc_time = datetime.utcnow()
-    est_time = utc_time - timedelta(hours=5)
+    est_time = utc_time - timedelta(hours=4)
     return est_time.strftime('%Y-%B-%d %I:%M%p')
 
 def append_to_output_file(user_hash, index, response):
