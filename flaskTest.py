@@ -3,6 +3,7 @@ import random
 import json
 import hashlib
 from datetime import datetime, timedelta, timezone
+from collections import defaultdict
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'  # Change this to a secure random key
@@ -10,6 +11,7 @@ app.secret_key = 'your_secret_key_here'  # Change this to a secure random key
 def load_samples():
     i_samples = []
     q_samples = []
+    sample_counts = defaultdict(int)
     
     try:
         with open('ga_output_filtered.jsonl', 'r') as file:
@@ -31,9 +33,17 @@ def load_samples():
                                 'score': sample['score'],
                                 'valid': sample['valid'],
                                 'prompt': sample['prompt'],
-                                'question': sample[question_key]
+                                'question': sample[question_key],
+                                'question_number': i
                             }
                             i_samples.append(new_sample)
+
+        # Load sample counts from a separate file
+        try:
+            with open('sample_counts.json', 'r') as count_file:
+                sample_counts = json.load(count_file)
+        except FileNotFoundError:
+            print("sample_counts.json not found, starting with empty counts")
 
     except FileNotFoundError:
         print("ga_output.jsonl file not found")
@@ -42,41 +52,23 @@ def load_samples():
         print(f"An unexpected error occurred: {e}")
         raise
 
-    random.shuffle(i_samples)
-    random.shuffle(q_samples)
-    return i_samples, q_samples
+    # Sort i_samples based on their count (least sampled first)
+    i_samples.sort(key=lambda x: sample_counts.get(f"{x['gen#']}_{x['prompt#']}_{x['question_number']}", 0))
+    
+    # Take only the first 100 least sampled i_samples
+    i_samples = i_samples[:100]
 
-i_samples, q_samples = load_samples()
+    # Shuffle the 100 least sampled i_samples
+    random.shuffle(i_samples)
+
+    random.shuffle(q_samples)
+    return i_samples, q_samples, sample_counts
+
+i_samples, q_samples, sample_counts = load_samples()
 
 def get_user_hash():
     user_data = f"{request.remote_addr}{request.user_agent.string}"
     return hashlib.md5(user_data.encode()).hexdigest()
-
-@app.route('/')
-def index():
-    user_hash = get_user_hash()
-    if 'user_data' not in session:
-        session['user_data'] = {'current_set_index': 0, 'answers': {}}
-    current_index = session['user_data']['current_set_index']
-
-    if current_index < len(i_samples):
-        current_set = i_samples[current_index]
-        return render_template('index.html',
-                               sample_set=current_set,
-                               set_index=current_index + 1,
-                               total_sets=len(i_samples) + len(q_samples),
-                               responses=session['user_data']['answers'],
-                               is_individual=True,
-                               i_samples_length=len(i_samples))
-    else:
-        current_set = q_samples[current_index - len(i_samples)]
-        return render_template('index.html',
-                               sample_set=current_set,
-                               set_index=current_index + 1,
-                               total_sets=len(i_samples) + len(q_samples),
-                               responses=session['user_data']['answers'],
-                               is_individual=False,
-                               i_samples_length=len(i_samples))
 
 def get_est_time():
     utc_time = datetime.now(timezone.utc)
@@ -88,9 +80,13 @@ def append_to_output_file(user_hash, index, response):
     
     if index < len(i_samples):
         sample = i_samples[index]
-        question_num = index % 5 + 1  # Calculate question number (1-5)
+        question_num = sample['question_number']
     else:
-        sample = q_samples[index - len(i_samples)]
+        q_index = index - len(i_samples)
+        if q_index >= len(q_samples):
+            print(f"Warning: Attempting to access q_samples out of range. Index: {q_index}, q_samples length: {len(q_samples)}")
+            return
+        sample = q_samples[q_index]
         question_num = 0  # 0 for question sets
     
     with open('survey_responses.jsonl', 'a') as f:
@@ -105,6 +101,41 @@ def append_to_output_file(user_hash, index, response):
         }
         json.dump(output, f)
         f.write('\n')
+
+    # Update sample counts
+    sample_key = f"{sample['gen#']}_{sample['prompt#']}_{question_num}"
+    sample_counts[sample_key] = sample_counts.get(sample_key, 0) + 1
+
+    # Save updated sample counts
+    with open('sample_counts.json', 'w') as count_file:
+        json.dump(sample_counts, count_file)
+
+@app.route('/')
+def index():
+    user_hash = get_user_hash()
+    if 'user_data' not in session:
+        session['user_data'] = {'current_set_index': 0, 'answers': {}}
+    current_index = session['user_data']['current_set_index']
+
+    total_samples = len(i_samples) + len(q_samples)
+    if current_index >= total_samples:
+        current_index = total_samples - 1
+        session['user_data']['current_set_index'] = current_index
+
+    if current_index < len(i_samples):
+        current_set = i_samples[current_index]
+        is_individual = True
+    else:
+        current_set = q_samples[current_index - len(i_samples)]
+        is_individual = False
+
+    return render_template('index.html',
+                           sample_set=current_set,
+                           set_index=current_index + 1,
+                           total_sets=total_samples,
+                           responses=session['user_data']['answers'],
+                           is_individual=is_individual,
+                           i_samples_length=len(i_samples))
 
 @app.route('/rate', methods=['POST'])
 def rate():
@@ -131,8 +162,11 @@ def rate():
         session['user_data']['current_set_index'] += 1
     elif 'previous' in request.form and current_index > 0:
         session['user_data']['current_set_index'] -= 1
-    elif 'skip_stage_1' in request.form and current_index < len(i_samples):
+    elif 'skip_stage_1' in request.form:
         session['user_data']['current_set_index'] = len(i_samples)
+
+    # Ensure the index doesn't go out of bounds
+    session['user_data']['current_set_index'] = min(session['user_data']['current_set_index'], total_samples - 1)
 
     session.modified = True  # Ensure the session is saved
     return redirect(url_for('index'))
