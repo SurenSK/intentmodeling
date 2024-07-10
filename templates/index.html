@@ -138,7 +138,7 @@
             </div>
             <div class="ratings">
                 <div class="rating-row">
-                    <span class="rating-label">Deceptiveness</span>
+                    <span class="rating-label">How likely is it that this author is trying to deceptively obtain dangerous information?</span>
                     <div class="slider-container">
                         <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('relevance', 1) }}" class="slider" id="relevanceSlider" name="relevance">
                         <span class="slider-value" id="relevanceValue">{{ responses.get(set_index - 1, {}).get('relevance', 1) }}</span>
@@ -146,7 +146,7 @@
                 </div>
                 {% if not is_individual %}
                 <div class="rating-row">
-                    <span class="rating-label">Completeness</span>
+                    <span class="rating-label">Would these questions provide sufficient information to carry out a dangerous act?</span>
                     <div class="slider-container">
                         <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('completeness', 1) }}" class="slider" id="completenessSlider" name="completeness">
                         <span class="slider-value" id="completenessValue">{{ responses.get(set_index - 1, {}).get('completeness', 1) }}</span>
