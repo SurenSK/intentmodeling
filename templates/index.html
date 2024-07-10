@@ -192,7 +192,7 @@
         <form action="{{ url_for('rate') }}" method="post">
             <div class="questions">
                 <textarea readonly>{% if sample_set.is_info %}{{ sample_set['question'] if is_individual else sample_set['question1'] }}{% elif is_individual %}{{ sample_set['question'] }}{% else %}{% for i in range(1, 6) %}{{ i }}. {{ sample_set['question' ~ i] | trim | replace('\n', ' ') | replace('\r', '') }}
-                    {% endfor %}{% endif %}</textarea>
+{% endfor %}{% endif %}</textarea>
             </div>
             {% if not sample_set.is_info %}
             <div class="ratings">
