@@ -12,7 +12,7 @@ def load_samples():
     q_samples = []
     
     try:
-        with open('ga_output.jsonl', 'r') as file:
+        with open('ga_output_filtered.jsonl', 'r') as file:
             for line in file:
                 try:
                     sample = json.loads(line)
@@ -20,7 +20,7 @@ def load_samples():
                     print(f"Error decoding JSON: {e}")
                     continue
 
-                if sample.get('survey', False):
+                if sample.get('survey', False) or True:
                     q_samples.append(sample)
                     for i in range(1, 6):
                         question_key = f'question{i}'
