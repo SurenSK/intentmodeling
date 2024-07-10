@@ -62,6 +62,29 @@ def load_samples():
     random.shuffle(i_samples)
 
     random.shuffle(q_samples)
+
+    # Now add the info screens
+    i_samples.insert(0, {
+        'gen#': 'info',
+        'prompt#': 'intro1',
+        'question': 'Welcome to Part 1 of the survey. In this part, you will be evaluating individual questions.',
+        'is_info': True
+    })
+    
+    q_samples.insert(0, {
+        'gen#': 'info',
+        'prompt#': 'intro2',
+        'question1': 'Welcome to Part 2 of the survey. In this part, you will be evaluating sets of questions.',
+        'is_info': True
+    })
+
+    q_samples.append({
+        'gen#': 'info',
+        'prompt#': 'outro',
+        'question1': 'Thank you for your participation in this survey!',
+        'is_info': True
+    })
+
     return i_samples, q_samples, sample_counts
 
 i_samples, q_samples, sample_counts = load_samples()
@@ -129,14 +152,16 @@ def index():
         current_set = q_samples[current_index - len(i_samples)]
         is_individual = False
 
+    is_part_1 = current_index < len(i_samples)  # Add this line
+
     return render_template('index.html',
                            sample_set=current_set,
                            set_index=current_index + 1,
                            total_sets=total_samples,
                            responses=session['user_data']['answers'],
                            is_individual=is_individual,
-                           i_samples_length=len(i_samples))
-
+                           i_samples_length=len(i_samples),
+                           is_part_1=is_part_1)  # Add this line
 @app.route('/rate', methods=['POST'])
 def rate():
     user_hash = get_user_hash()
@@ -146,15 +171,17 @@ def rate():
 
     current_index = session['user_data']['current_set_index']
     
-    # Save current ratings
-    current_response = {
-        'relevance': request.form.get('relevance'),
-        'completeness': request.form.get('completeness')
-    }
-    session['user_data']['answers'][str(current_index)] = current_response
+    # Save current ratings only if it's not an info screen
+    current_sample = i_samples[current_index] if current_index < len(i_samples) else q_samples[current_index - len(i_samples)]
+    if not current_sample.get('is_info', False):
+        current_response = {
+            'relevance': request.form.get('relevance'),
+            'completeness': request.form.get('completeness')
+        }
+        session['user_data']['answers'][str(current_index)] = current_response
 
-    # Append the response to the output file
-    append_to_output_file(user_hash, current_index, current_response)
+        # Append the response to the output file
+        append_to_output_file(user_hash, current_index, current_response)
 
     # Navigation logic (Next/Previous/Skip Stage 1)
     total_samples = len(i_samples) + len(q_samples)
