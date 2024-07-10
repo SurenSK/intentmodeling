@@ -82,12 +82,56 @@ def index():
                                responses=responses[user_hash]['answers'],
                                is_individual=False)
 
+from datetime import datetime, timedelta
+def get_est_time():
+    # Get current UTC time and subtract 5 hours for EST
+    # Note: This doesn't account for daylight saving time
+    utc_time = datetime.utcnow()
+    est_time = utc_time - timedelta(hours=5)
+    return est_time.strftime('%Y-%B-%d %I:%M%p')
+
 def append_to_output_file(user_hash, index, response):
+    current_time = get_est_time()
+    
+    if index < len(i_samples):
+        sample = i_samples[index]
+        question_num = index % 5 + 1  # Calculate question number (1-5)
+    else:
+        sample = q_samples[index - len(i_samples)]
+        question_num = 0  # 0 for question sets
+    
     with open('survey_responses.jsonl', 'a') as f:
         output = {
+            'date-time': current_time,
             'user_hash': user_hash,
-            'index': index,
-            'response': response
+            'gen#': sample['gen#'],
+            'prompt#': sample['prompt#'],
+            'question#': question_num,
+            'relevance': response['relevance'],
+            'completeness': response['completeness']
+        }
+        json.dump(output, f)
+        f.write('\n')
+
+def append_to_output_file(user_hash, index, response):
+    current_time = get_est_time()
+    
+    if index < len(i_samples):
+        sample = i_samples[index]
+        question_num = index % 5 + 1  # Calculate question number (1-5)
+    else:
+        sample = q_samples[index - len(i_samples)]
+        question_num = 0  # 0 for question sets
+    
+    with open('survey_responses.jsonl', 'a') as f:
+        output = {
+            'date-time': current_time,
+            'user_hash': user_hash,
+            'gen#': sample['gen#'],
+            'prompt#': sample['prompt#'],
+            'question#': question_num,
+            'relevance': response['relevance'],
+            'completeness': response['completeness']
         }
         json.dump(output, f)
         f.write('\n')
@@ -119,6 +163,5 @@ def rate():
         responses[user_hash]['current_set_index'] -= 1
 
     return redirect(url_for('index'))
-
 if __name__ == '__main__':
     app.run(debug=True)
