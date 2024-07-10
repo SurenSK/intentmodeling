@@ -75,11 +75,13 @@
         .slider-wrapper {
             display: flex;
             align-items: center;
+            position: relative;
+            padding: 10px 0;
         }
         .slider {
             flex-grow: 1;
             -webkit-appearance: none;
-            width: 100%;
+            width: calc(100% - 240px);
             height: 15px;
             border-radius: 5px;
             background: #d3d3d3;
@@ -87,7 +89,7 @@
             opacity: 0.7;
             -webkit-transition: .2s;
             transition: opacity .2s;
-            margin: 0 10px;
+            margin: 0 20px;
         }
         .slider:hover {
             opacity: 1;
@@ -108,10 +110,36 @@
             background: #3498db;
             cursor: pointer;
         }
+        .slider-notches {
+            position: absolute;
+            top: 50%;
+            left: 152.5px;
+            right: 152.5px;
+            height: 0;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+        .slider-notch {
+            width: 2px;
+            height: 10px;
+            background-color: #95a5a6;
+            transform: translateY(-50%);
+        }
         .slider-label {
-            font-size: 11px;
+            font-size: 12px;
             color: #95a5a6;
             white-space: nowrap;
+            width: 120px;
+            text-align: center;
+        }
+        .slider-label-left {
+            text-align: right;
+            padding-right: 10px;
+        }
+        .slider-label-right {
+            text-align: left;
+            padding-left: 10px;
         }
         .navigation {
             display: flex;
@@ -168,9 +196,17 @@
                     <div class="slider-container">
                         <div class="slider-value" id="relevanceValue">Not at all likely</div>
                         <div class="slider-wrapper">
-                            <span class="slider-label">Not at all likely</span>
+                            <span class="slider-label slider-label-left">Not at all likely</span>
                             <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('relevance', 1) }}" class="slider" id="relevanceSlider" name="relevance">
-                            <span class="slider-label">Extremely likely</span>
+                            <div class="slider-notches">
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                            </div>
+                            <span class="slider-label slider-label-right">Extremely likely</span>
                         </div>
                     </div>
                 </div>
@@ -180,9 +216,17 @@
                     <div class="slider-container">
                         <div class="slider-value" id="completenessValue">Not at all likely</div>
                         <div class="slider-wrapper">
-                            <span class="slider-label">Not at all likely</span>
+                            <span class="slider-label slider-label-left">Not at all likely</span>
                             <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('completeness', 1) }}" class="slider" id="completenessSlider" name="completeness">
-                            <span class="slider-label">Extremely likely</span>
+                            <div class="slider-notches">
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                                <div class="slider-notch"></div>
+                            </div>
+                            <span class="slider-label slider-label-right">Extremely likely</span>
                         </div>
                     </div>
                 </div>
