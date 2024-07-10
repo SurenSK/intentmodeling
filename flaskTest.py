@@ -82,9 +82,9 @@ def index():
                                responses=responses[user_hash]['answers'],
                                is_individual=False)
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 def get_est_time():
-    utc_time = datetime.utcnow()
+    utc_time = datetime.now(timezone.utc)
     est_time = utc_time - timedelta(hours=4)
     return est_time.strftime('%Y-%B-%d %I:%M%p')
 
