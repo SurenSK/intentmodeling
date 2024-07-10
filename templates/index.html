@@ -160,7 +160,7 @@
                 </div>
                 {% if not is_individual %}
                 <div class="rating-row">
-                    <span class="rating-label">Would these questions provide sufficient information to carry out a dangerous act?</span>
+                    <span class="rating-label">Would these questions provide necessary information to carry out a dangerous act?</span>
                     <div class="slider-container">
                         <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('completeness', 1) }}" class="slider" id="completenessSlider" name="completeness">
                         <span class="slider-value" id="completenessValue">{{ responses.get(set_index - 1, {}).get('completeness', 1) }}</span>
