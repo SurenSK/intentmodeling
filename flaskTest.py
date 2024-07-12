@@ -30,9 +30,9 @@ def load_samples():
                             new_sample = {
                                 'gen#': sample['gen#'],
                                 'prompt#': sample['prompt#'],
-                                'score': sample['score'],
-                                'valid': sample['valid'],
-                                'prompt': sample['prompt'],
+                                'score': sample.get('score',0),
+                                'valid': sample.get('valid', True),
+                                'prompt': sample.get('prompt', ""),
                                 'question': sample[question_key],
                                 'question_number': i
                             }
