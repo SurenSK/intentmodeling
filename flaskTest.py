@@ -85,7 +85,8 @@ def load_samples():
 
     return i_samples, q_samples, sample_counts
 
-i_samples, q_samples, sample_counts = load_samples()
+base_i_samples, base_q_samples, base_sample_counts = load_samples()
+userdata = {}
 
 import string
 import random
@@ -126,6 +127,9 @@ def get_est_time():
 
 def append_to_output_file(user_hash, index, response):
     current_time = get_est_time()
+    i_samples = userdata[user_hash]["i_samples"]
+    q_samples = userdata[user_hash]["q_samples"]
+    sample_counts = userdata[user_hash]["sample_counts"]
     
     if index < len(i_samples):
         sample = i_samples[index]
@@ -164,7 +168,16 @@ def index():
     user_hash = get_user_hash()
     if 'user_data' not in session:
         session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
+    if user_hash not in userdata:
+        userdata[user_hash] = {
+            "i_samples": base_i_samples.copy(),
+            "q_samples": base_q_samples.copy(),
+            "sample_counts": base_sample_counts.copy()
+        }
     current_index = session['user_data']['current_set_index']
+    i_samples = userdata[user_hash]["i_samples"]
+    q_samples = userdata[user_hash]["q_samples"]
+    sample_counts = userdata[user_hash]["sample_counts"]
 
     total_samples = len(i_samples) + len(q_samples)
     if current_index >= total_samples:
@@ -250,8 +263,17 @@ def rate():
     
     if 'user_data' not in session:
         session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
+    if user_hash not in userdata:
+        userdata[user_hash] = {
+            "i_samples": base_i_samples.copy(),
+            "q_samples": base_q_samples.copy(),
+            "sample_counts": base_sample_counts.copy()
+        }
 
     current_index = session['user_data']['current_set_index']
+    i_samples = userdata[user_hash]["i_samples"]
+    q_samples = userdata[user_hash]["q_samples"]
+    sample_counts = userdata[user_hash]["sample_counts"]
     
     if current_index < len(i_samples):
         current_sample = i_samples[current_index]
@@ -288,11 +310,11 @@ def rate():
 @app.route('/reset')
 def reset():
     session.clear()
-    for sample in i_samples:
-        sample['relevance'] = 0
-    for sample in q_samples:
-        sample['relevance'] = 0
-        sample['completeness'] = 0
+    user_hash = get_user_hash()
+    # delete user data at hash
+    if user_hash in userdata:
+        print(f"Deleting user data for {user_hash}")
+        del userdata[user_hash]
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
