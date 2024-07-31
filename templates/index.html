@@ -209,7 +209,7 @@
             {% set adjusted_total = total_sets - 3 %}
             {% set adjusted_current = set_index - (1 if is_part_1 else 2) %}
             <p>Question Set {{ adjusted_current }} of {{ adjusted_total }}</p>
-            <p>Skipped {{ session['user_data']['skipped'] }} questions</p>
+            <p>Skipped {{ skips }} questions</p>
         </div>
         {% endif %}
     </div>

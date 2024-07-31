@@ -228,6 +228,7 @@ def index():
                            i_samples_length=len(i_samples),
                            is_part_1=is_part_1,
                            completion_code=completion_code,
+                           skips = skipped_questions,
                            user_name=session['user_data'].get('name', ''))
 
 
