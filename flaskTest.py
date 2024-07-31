@@ -128,7 +128,7 @@ def append_to_output_file(user_hash, index, response):
 def index():
     user_hash = get_user_hash()
     if 'user_data' not in session:
-        session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
+        session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': '', 'skipped': 0, 'shown': 0}
     current_index = session['user_data']['current_set_index']
 
     total_samples = len(i_samples) + len(q_samples)
@@ -175,7 +175,7 @@ def rate():
     user_hash = get_user_hash()
     
     if 'user_data' not in session:
-        session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
+        session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': '', 'skipped': 0, 'shown': 0}
 
     current_index = session['user_data']['current_set_index']
     
@@ -185,6 +185,16 @@ def rate():
             'relevance': request.form.get('relevance'),
             'completeness': request.form.get('completeness')
         }
+        if current_response['relevance'] == '1':
+            session['user_data']['skipped'] += 1
+        if current_response['completeness'] == '1':
+            session['user_data']['skipped'] += 1
+        if current_response['relevance']:
+            session['user_data']['shown'] += 1
+        if current_response['completeness']:
+            session['user_data']['shown'] += 1
+        print(f"Skipped: {session['user_data']['skipped']}")
+        print(f"Shown: {session['user_data']['shown']}")
         session['user_data']['answers'][str(current_index)] = current_response
 
         append_to_output_file(user_hash, current_index, current_response)
