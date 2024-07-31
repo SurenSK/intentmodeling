@@ -34,7 +34,6 @@ def load_samples():
                                 'valid': sample.get('valid', True),
                                 'prompt': sample.get('prompt', ""),
                                 'question': sample[question_key],
-                                'relevance': 0,
                                 'question_number': i
                             }
                             i_samples.append(new_sample)
@@ -55,17 +54,12 @@ def load_samples():
     i_samples.sort(key=lambda x: sample_counts.get(f"{x['gen#']}_{x['prompt#']}_{x['question_number']}", 0))
     i_samples = i_samples[:100]
     random.shuffle(i_samples)
-    # only load 5 q_samples for now
-    # q_samples = q_samples[:5]
     random.shuffle(q_samples)
-    for sample in q_samples:
-        sample['relevance'] = 0
-        sample['completeness'] = 0
 
     i_samples.insert(0, {
         'gen#': 'info',
         'prompt#': 'intro1',
-        'question': 'Welcome to Part 1 of the survey. In this part, you will be evaluating individual questions. Evaluate each question as if it were from an entirely separate author, without the context of the rest of the survey.',
+        'question1': 'Welcome to Part 1 of the survey. In this part, you will be evaluating individual questions. Evaluate each question as if it were from an entirely separate author, without the context of the rest of the survey.',
         'is_info': True
     })
     
@@ -85,36 +79,7 @@ def load_samples():
 
     return i_samples, q_samples, sample_counts
 
-base_i_samples, base_q_samples, base_sample_counts = load_samples()
-userdata = {}
-
-import string
-import random
-def base36encode(number):
-    alphabet = string.digits + string.ascii_uppercase
-    if number == 0:
-        return alphabet[0]
-    base36 = []
-    while number:
-        number, i = divmod(number, 36)
-        base36.append(alphabet[i])
-    return ''.join(reversed(base36))
-
-def generate_completion_code(questions_answered, user_hash):
-    # Convert questions_answered to base 36 (0-9 + A-Z)
-    questions_part = base36encode(questions_answered).zfill(2).upper()
-    
-    # Get last 2 characters of user_hash (uppercase)
-    hash_part = user_hash[-2:].upper()
-    
-    # Combine parts
-    code = questions_part + hash_part
-    
-    # Generate checksum (sum of ASCII values mod 36)
-    checksum = sum(ord(c) for c in code) % 36
-    checksum_char = base36encode(checksum)
-    
-    return code + checksum_char
+i_samples, q_samples, sample_counts = load_samples()
 
 def get_user_hash():
     user_data = f"{request.remote_addr}{request.user_agent.string}"
@@ -127,9 +92,6 @@ def get_est_time():
 
 def append_to_output_file(user_hash, index, response):
     current_time = get_est_time()
-    i_samples = userdata[user_hash]["i_samples"]
-    q_samples = userdata[user_hash]["q_samples"]
-    sample_counts = userdata[user_hash]["sample_counts"]
     
     if index < len(i_samples):
         sample = i_samples[index]
@@ -162,22 +124,12 @@ def append_to_output_file(user_hash, index, response):
     with open('sample_counts.json', 'w') as count_file:
         json.dump(sample_counts, count_file)
 
-
 @app.route('/')
 def index():
     user_hash = get_user_hash()
     if 'user_data' not in session:
         session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
-    if user_hash not in userdata:
-        userdata[user_hash] = {
-            "i_samples": base_i_samples.copy(),
-            "q_samples": base_q_samples.copy(),
-            "sample_counts": base_sample_counts.copy()
-        }
     current_index = session['user_data']['current_set_index']
-    i_samples = userdata[user_hash]["i_samples"]
-    q_samples = userdata[user_hash]["q_samples"]
-    sample_counts = userdata[user_hash]["sample_counts"]
 
     total_samples = len(i_samples) + len(q_samples)
     if current_index >= total_samples:
@@ -190,53 +142,16 @@ def index():
     else:
         current_set = q_samples[current_index - len(i_samples)]
         is_individual = False
-    
-    is_part_1 = current_index < len(i_samples)
-    
-    # Initialize counters
 
-    skipped_questions = 0
-    total_questions = 0
-    questions_answered = 0
-    
-    # Count skipped and total questions
-    for sample in i_samples:
-        if sample.get('gen#') == 'info':
-            continue
-        total_questions += 1
-        try:
-            skipped_questions += sample["relevance"]==1
-            questions_answered += sample["relevance"]>1
-        except:
-            pass
-    for sample in q_samples:
-        if sample.get('gen#') == 'info':
-            continue
-        total_questions += 1
-        try:
-            skipped_questions += sample["relevance"]==1
-            skipped_questions += sample["completeness"]==1
-            questions_answered += sample["relevance"]>1
-            questions_answered += sample["completeness"]>1
-        except:
-            pass
-        
-    print(f"Total questions: {total_questions}\nSkipped questions: {skipped_questions}\nAnswered questions: {questions_answered}")
-    # Handle outro screen
-    if current_set.get('prompt#') == 'outro':
-        print("Outro screen")
-        completion_code = generate_completion_code(questions_answered, user_hash)
-        current_set['question1'] = "Thank you for your participation in this survey!" + \
-            f"\nYour completion code is: {completion_code}\n" + \
-            "Please send this code to the researcher to receive your compensation. " + \
-            "Save a screenshot of this page for your records."
-        
-    # Handle info screens
+    is_part_1 = current_index < len(i_samples)
+
+    # Fix for both Part 1 and Part 2 intro screens
     if current_set.get('is_info', False):
-        if 'question' not in current_set:
+        if 'question1' in current_set:
+            current_set['question'] = current_set['question1']
+        elif 'question' not in current_set:
             current_set['question'] = current_set.get('question', "Welcome to the survey.")
 
-    completion_code = generate_completion_code(questions_answered, user_hash)
     return render_template('index.html',
                            sample_set=current_set,
                            set_index=current_index + 1,
@@ -245,8 +160,6 @@ def index():
                            is_individual=is_individual,
                            i_samples_length=len(i_samples),
                            is_part_1=is_part_1,
-                           completion_code=completion_code,
-                           skips = skipped_questions,
                            user_name=session['user_data'].get('name', ''))
 
 
@@ -263,36 +176,18 @@ def rate():
     
     if 'user_data' not in session:
         session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
-    if user_hash not in userdata:
-        userdata[user_hash] = {
-            "i_samples": base_i_samples.copy(),
-            "q_samples": base_q_samples.copy(),
-            "sample_counts": base_sample_counts.copy()
-        }
 
     current_index = session['user_data']['current_set_index']
-    i_samples = userdata[user_hash]["i_samples"]
-    q_samples = userdata[user_hash]["q_samples"]
-    sample_counts = userdata[user_hash]["sample_counts"]
     
-    if current_index < len(i_samples):
-        current_sample = i_samples[current_index]
-    else:
-        current_sample = q_samples[current_index - len(i_samples)]
-
+    current_sample = i_samples[current_index] if current_index < len(i_samples) else q_samples[current_index - len(i_samples)]
     if not current_sample.get('is_info', False):
-        relevance = request.form.get('relevance')
-        completeness = request.form.get('completeness')
-        
-        current_sample['relevance'] = int(relevance) if relevance else 1
-        current_sample['completeness'] = int(completeness) if completeness else 1
-
-        session['user_data']['answers'][str(current_index)] = {
-            'relevance': current_sample['relevance'],
-            'completeness': current_sample['completeness']
+        current_response = {
+            'relevance': request.form.get('relevance'),
+            'completeness': request.form.get('completeness')
         }
+        session['user_data']['answers'][str(current_index)] = current_response
 
-        append_to_output_file(user_hash, current_index, session['user_data']['answers'][str(current_index)])
+        append_to_output_file(user_hash, current_index, current_response)
 
     total_samples = len(i_samples) + len(q_samples)
     if 'next' in request.form and current_index < total_samples - 1:
@@ -310,11 +205,6 @@ def rate():
 @app.route('/reset')
 def reset():
     session.clear()
-    user_hash = get_user_hash()
-    # delete user data at hash
-    if user_hash in userdata:
-        print(f"Deleting user data for {user_hash}")
-        del userdata[user_hash]
     return redirect(url_for('index'))
 
 if __name__ == '__main__':

@@ -165,9 +165,9 @@
                     <div class="slider-container">
                         <div class="slider-value" id="relevanceValue">Not at all likely</div>
                         <div class="slider-wrapper">
-                            <input type="range" id="relevanceSlider" name="relevance" min="1" max="7" value="{{ sample_set.relevance if sample_set.relevance > 1 else 1 }}" class="slider">                        </div>
+                            <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('relevance', 1) }}" class="slider" id="relevanceSlider" name="relevance">
+                        </div>
                         <div class="slider-labels">
-                            <span>No Answer</span>
                             <span>Not at all likely</span>
                             <span>Slightly likely</span>
                             <span>Somewhat likely</span>
@@ -183,10 +183,9 @@
                     <div class="slider-container">
                         <div class="slider-value" id="completenessValue">Not at all likely</div>
                         <div class="slider-wrapper">
-                            <input type="range" id="completenessSlider" name="completeness" min="1" max="7" value="{{ sample_set.completeness if sample_set.completeness > 1 else 1 }}" class="slider">
+                            <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('completeness', 1) }}" class="slider" id="completenessSlider" name="completeness">
                         </div>
                         <div class="slider-labels">
-                            <span>No Answer</span>
                             <span>Not at all likely</span>
                             <span>Slightly likely</span>
                             <span>Somewhat likely</span>
@@ -194,7 +193,7 @@
                             <span>Very likely</span>
                             <span>Extremely likely</span>
                         </div>
-                    </div>                
+                    </div>
                 </div>
                 {% endif %}
             </div>
@@ -209,15 +208,13 @@
         <div class="progress">
             {% set adjusted_total = total_sets - 3 %}
             {% set adjusted_current = set_index - (1 if is_part_1 else 2) %}
-            <p>Question Set {{ adjusted_current }} of {{ adjusted_total }}</p>
-            <p>Skipped {{ skips }} questions</p>
+            Question Set {{ adjusted_current }} of {{ adjusted_total }}
         </div>
         {% endif %}
     </div>
 
     <script>
         const sliderLabels = [
-            "No Answer",
             "Not at all likely",
             "Slightly likely",
             "Somewhat likely",
