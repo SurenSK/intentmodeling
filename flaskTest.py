@@ -208,7 +208,7 @@ def index():
         except:
             pass
         
-
+    print(f"Total questions: {total_questions}\nSkipped questions: {skipped_questions}\nAnswered questions: {questions_answered}")
     # Handle outro screen
     if current_set.get('prompt#') == 'outro':
         completion_code = generate_completion_code(questions_answered, user_hash)
