@@ -56,7 +56,7 @@ def load_samples():
     i_samples = i_samples[:100]
     random.shuffle(i_samples)
     # only load 5 q_samples for now
-    # q_samples = q_samples[:5]
+    q_samples = q_samples[:5]
     random.shuffle(q_samples)
     for sample in q_samples:
         sample['relevance'] = 0
