@@ -54,6 +54,8 @@ def load_samples():
     i_samples.sort(key=lambda x: sample_counts.get(f"{x['gen#']}_{x['prompt#']}_{x['question_number']}", 0))
     i_samples = i_samples[:100]
     random.shuffle(i_samples)
+    # only load 5 q_samples for now
+    q_samples = q_samples[:5]
     random.shuffle(q_samples)
 
     i_samples.insert(0, {
@@ -80,6 +82,34 @@ def load_samples():
     return i_samples, q_samples, sample_counts
 
 i_samples, q_samples, sample_counts = load_samples()
+
+import string
+import random
+def base36encode(number):
+    alphabet = string.digits + string.ascii_uppercase
+    if number == 0:
+        return alphabet[0]
+    base36 = []
+    while number:
+        number, i = divmod(number, 36)
+        base36.append(alphabet[i])
+    return ''.join(reversed(base36))
+
+def generate_completion_code(questions_answered, user_hash):
+    # Convert questions_answered to base 36 (0-9 + A-Z)
+    questions_part = base36encode(questions_answered).zfill(2).upper()
+    
+    # Get last 2 characters of user_hash (uppercase)
+    hash_part = user_hash[-2:].upper()
+    
+    # Combine parts
+    code = questions_part + hash_part
+    
+    # Generate checksum (sum of ASCII values mod 36)
+    checksum = sum(ord(c) for c in code) % 36
+    checksum_char = base36encode(checksum)
+    
+    return code + checksum_char
 
 def get_user_hash():
     user_data = f"{request.remote_addr}{request.user_agent.string}"
@@ -124,6 +154,7 @@ def append_to_output_file(user_hash, index, response):
     with open('sample_counts.json', 'w') as count_file:
         json.dump(sample_counts, count_file)
 
+
 @app.route('/')
 def index():
     user_hash = get_user_hash()
@@ -142,9 +173,13 @@ def index():
     else:
         current_set = q_samples[current_index - len(i_samples)]
         is_individual = False
+    
+    if current_set['prompt#'] == 'outro':
+        questions_answered = session['user_data']['shown'] - session['user_data']['skipped']
+        completion_code = generate_completion_code(questions_answered, user_hash)
+        current_set['question1'] += f"\nYour completion code is: {completion_code}\nPlease send this code to the researcher to receive your compensation. Save a screenshot of this page for your records."
 
     is_part_1 = current_index < len(i_samples)
-
     # Fix for both Part 1 and Part 2 intro screens
     if current_set.get('is_info', False):
         if 'question1' in current_set:
@@ -152,6 +187,8 @@ def index():
         elif 'question' not in current_set:
             current_set['question'] = current_set.get('question', "Welcome to the survey.")
 
+    questions_answered = session['user_data'].get('shown', 0) - session['user_data'].get('skipped', 0)
+    completion_code = generate_completion_code(questions_answered, user_hash)
     return render_template('index.html',
                            sample_set=current_set,
                            set_index=current_index + 1,
@@ -160,6 +197,7 @@ def index():
                            is_individual=is_individual,
                            i_samples_length=len(i_samples),
                            is_part_1=is_part_1,
+                           completion_code=completion_code,
                            user_name=session['user_data'].get('name', ''))
 
 
