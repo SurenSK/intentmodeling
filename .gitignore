@@ -9,3 +9,4 @@ sample_counts.json
 *.pptx
 i_samples.jsonl
 q_samples.jsonl
+/instance/

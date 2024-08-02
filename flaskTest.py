@@ -3,13 +3,41 @@ import random
 import json
 import hashlib
 from datetime import datetime, timedelta, timezone
+from flask_sqlalchemy import SQLAlchemy
 from threading import Lock
+from sqlalchemy.orm.attributes import flag_modified
+
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'  # Replace with a real secret key
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///surveydata.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-# In-memory storage for user-specific data
-user_data = {}
+class UserData(db.Model):
+    id = db.Column(db.String, primary_key=True)  # user_hash as primary key
+    data = db.Column(db.PickleType)  # Storing the entire dictionary as a pickled object
+
+    def __repr__(self):
+        return f'<UserData {self.id}>'
+with app.app_context():
+    db.create_all()
+
+def get_user_data(user_hash):
+    user_record = UserData.query.get(user_hash)
+    if user_record:
+        return user_record.data
+    else:
+        return None  # Handle case where user data is not found
+
+def save_user_data(user_hash, data):
+    user_record = UserData.query.get(user_hash)
+    if not user_record:
+        user_record = UserData(id=user_hash, data=data)
+    else:
+        user_record.data = data
+    db.session.add(user_record)
+    db.session.commit()
+
 input_file_lock = Lock()
 
 def load_and_update_samples(jsonl_file, sample_count, select_lowest=True):
@@ -35,7 +63,7 @@ def prepare_user_samples():
     roll = q_samples[0]['roll']
     i_samples = [sample["data"] for sample in i_samples]
     q_samples = [sample["data"] for sample in q_samples][0]
-    # q_samples = q_samples[:2]
+    q_samples = q_samples[:2]
 
     random.shuffle(i_samples)
     random.shuffle(q_samples)
@@ -105,7 +133,7 @@ def count_skipped_questions(user_data):
 
 def get_completion_code(user_data):
     user_hash = get_user_hash()
-    skipped_questions, answered_questions = count_skipped_questions(user_data[user_hash])
+    skipped_questions, answered_questions = count_skipped_questions(user_data)
     answered_code = base36_encode(answered_questions)
     unique_hash_segment = user_hash[-4:]
     pre_checksum_string = answered_code + unique_hash_segment
@@ -127,11 +155,11 @@ def base36_encode(number):
 output_file_lock = Lock()
 def append_to_output_file(user_hash, sample, response):
     current_time = get_est_time()
-    
+    user_data = get_user_data(user_hash)
     output = {
         'date-time': current_time,
         'user_hash': user_hash,
-        'name': user_data[user_hash]['name'],
+        'name': user_data['name'],
         'gen#': sample['gen#'],
         'prompt#': sample['prompt#'],
         'question#': sample.get('question_number', -1),
@@ -146,29 +174,38 @@ def append_to_output_file(user_hash, sample, response):
 @app.route('/')
 def index():
     user_hash = get_user_hash()
-    if user_hash not in user_data:
+    user = UserData.query.get(user_hash)
+    
+    if not user:
+        # Prepare user samples if no existing session data
         i_samples, q_samples, roll = prepare_user_samples()
-        user_data[user_hash] = {
+        user_data = {
             'current_set_index': 0,
             'name': '',
             'roll': roll,
             'i_samples': i_samples,
             'q_samples': q_samples
         }
+        # Store the new user data in the database
+        new_user = UserData(id=user_hash, data=user_data)
+        db.session.add(new_user)
+        db.session.commit()
+        user = new_user
 
-    user = user_data[user_hash]
-    current_index = user['current_set_index']
-    total_samples = len(user['i_samples']) + len(user['q_samples'])
+    user_data = user.data
+    current_index = user_data['current_set_index']
+    total_samples = len(user_data['i_samples']) + len(user_data['q_samples'])
 
     if current_index >= total_samples:
         current_index = total_samples - 1
-        user['current_set_index'] = current_index
+        user_data['current_set_index'] = current_index
+        db.session.commit()
 
-    if current_index < len(user['i_samples']):
-        current_set = user['i_samples'][current_index]
+    if current_index < len(user_data['i_samples']):
+        current_set = user_data['i_samples'][current_index]
         is_individual = True
     else:
-        current_set = user['q_samples'][current_index - len(user['i_samples'])]
+        current_set = user_data['q_samples'][current_index - len(user_data['i_samples'])]
         is_individual = False
 
     is_end = False
@@ -176,40 +213,57 @@ def index():
         completion_code = get_completion_code(user_data)
         current_set['question1'] = f"Thank you for your participation in this survey!\nYour completion code is: {completion_code}.\nPlease email this code to the researcher (skumar43@gmail.com) to receive your compensation.\nSave a record of this screen for your records."
         is_end = True
-        del user_data[user_hash]
+        # Remove the user's data from the database since the survey is complete
+        db.session.delete(user)
+        db.session.commit()
 
-    is_part_1 = current_index < len(user['i_samples'])
+    is_part_1 = current_index < len(user_data['i_samples'])
 
-    skipped_questions, answered_questions = count_skipped_questions(user)
+    skipped_questions, answered_questions = count_skipped_questions(user_data)
     
-    # print(f"Current index: {current_index}, Rendering sample_set: {current_set}")
-    # print(f"Skipped questions: {skipped_questions}, Answered questions: {answered_questions}")
-
     return render_template('index.html',
                            sample_set=current_set,
                            set_index=current_index + 1,
                            total_sets=total_samples,
                            is_individual=is_individual,
-                           skips = skipped_questions,
-                           i_samples_length=len(user['i_samples']),
+                           skips=skipped_questions,
+                           i_samples_length=len(user_data['i_samples']),
                            is_part_1=is_part_1,
                            is_end=is_end,
-                           user_name=user['name'])
+                           user_name=user_data['name'])
 
 @app.route('/update_name', methods=['POST'])
 def update_name():
     user_hash = get_user_hash()
+    user = UserData.query.get(user_hash)
+    if not user:
+        # Handle case where user does not exist
+        return 'User not found', 404
+
     data = request.get_json()
-    user_data[user_hash]['name'] = data.get('name', '')
+    user_data = user.data
+    user_data['name'] = data.get('name', '')
+
+    # Save changes to the database
+    db.session.commit()
+
     return '', 204
+
 
 @app.route('/rate', methods=['POST'])
 def rate():
+    print(request.form)
     user_hash = get_user_hash()
-    user = user_data[user_hash]
-    current_index = user['current_set_index']
+    user_record = UserData.query.get(user_hash)
+    if not user_record:
+        # Handle the case where there is no user data (possibly redirect to an error page or initialization)
+        return redirect(url_for('index'))
+
+    user_data = user_record.data
+    current_index = user_data['current_set_index']
     
-    current_sample = user['i_samples'][current_index] if current_index < len(user['i_samples']) else user['q_samples'][current_index - len(user['i_samples'])]
+    current_sample = user_data['i_samples'][current_index] if current_index < len(user_data['i_samples']) else user_data['q_samples'][current_index - len(user_data['i_samples'])]
+    print(current_sample)
     if not current_sample.get('is_info', False):
         relevance = request.form.get('relevance')
         completeness = request.form.get('completeness', 0)  # Default to 0 if not provided
@@ -218,28 +272,39 @@ def rate():
         if 'completeness' in current_sample:  # This check ensures it's a q_sample
             current_sample['completeness'] = int(completeness) if completeness else current_sample.get('completeness', 0)
         
+        # Optionally update the output file or database for long-term storage of responses
         append_to_output_file(user_hash, current_sample, {'relevance': relevance, 'completeness': completeness})
 
-    total_samples = len(user['i_samples']) + len(user['q_samples'])
+    total_samples = len(user_data['i_samples']) + len(user_data['q_samples'])
     if 'next' in request.form and current_index < total_samples - 1:
-        user['current_set_index'] += 1
+        print(f"Current index pre update: {user_data['current_set_index']}")
+        user_data['current_set_index'] += 1
+        print(f"Current index post update: {user_data['current_set_index']}")
     elif 'previous' in request.form and current_index > 0:
-        user['current_set_index'] -= 1
+        user_data['current_set_index'] -= 1
     elif 'skip_stage_1' in request.form:
-        for i_sample in user['i_samples']:
+        for i_sample in user_data['i_samples']:
             i_sample['relevance'] = 1 if i_sample['relevance'] == 0 else i_sample['relevance']
-        user['current_set_index'] = len(user['i_samples'])
+        user_data['current_set_index'] = len(user_data['i_samples'])
 
-    user['current_set_index'] = min(user['current_set_index'], total_samples - 1)
+    user_data['current_set_index'] = min(user_data['current_set_index'], total_samples - 1)
+
+    # Commit changes to the database
+    flag_modified(user_record, 'data')
+    db.session.commit()
 
     return redirect(url_for('index'))
 
 @app.route('/reset')
 def reset():
     user_hash = get_user_hash()
-    if user_hash in user_data:
-        del user_data[user_hash]
+    user = UserData.query.get(user_hash)
+    if user:
+        # Delete the user data from the database
+        db.session.delete(user)
+        db.session.commit()
     return redirect(url_for('index'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)
