@@ -35,7 +35,7 @@ def prepare_user_samples():
     roll = q_samples[0]['roll']
     i_samples = [sample["data"] for sample in i_samples]
     q_samples = [sample["data"] for sample in q_samples][0]
-    q_samples = q_samples[:2]
+    # q_samples = q_samples[:2]
 
     random.shuffle(i_samples)
     random.shuffle(q_samples)
