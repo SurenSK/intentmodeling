@@ -35,6 +35,7 @@ def prepare_user_samples():
     roll = q_samples[0]['roll']
     i_samples = [sample["data"] for sample in i_samples]
     q_samples = [sample["data"] for sample in q_samples][0]
+    q_samples = q_samples[:2]
 
     random.shuffle(i_samples)
     random.shuffle(q_samples)
@@ -77,6 +78,50 @@ def get_est_time():
     utc_time = datetime.now(timezone.utc)
     est_time = utc_time - timedelta(hours=4)
     return est_time.strftime('%Y-%B-%d %I:%M%p')
+
+def count_skipped_questions(user_data):
+    skipped_questions = 0
+    answered_questions = 0
+    for i_sample in user_data['i_samples']:
+        if i_sample.get('is_info', False):
+            continue
+        if i_sample['relevance'] == 1:
+            skipped_questions += 1
+        elif i_sample['relevance'] > 1:
+            answered_questions += 1
+    for q_sample in user_data['q_samples']:
+        if q_sample.get('is_info', False):
+            continue
+        if q_sample['relevance'] == 1:
+            skipped_questions += 1
+        elif q_sample['relevance'] > 1:
+            answered_questions += 1
+        if q_sample['completeness'] == 1:
+            skipped_questions += 1
+        elif q_sample['completeness'] > 1:
+            answered_questions += 1
+    return skipped_questions, answered_questions
+
+def get_completion_code(user_data):
+    user_hash = get_user_hash()
+    skipped_questions, answered_questions = count_skipped_questions(user_data[user_hash])
+    answered_code = base36_encode(answered_questions)
+    unique_hash_segment = user_hash[-4:]
+    pre_checksum_string = answered_code + unique_hash_segment
+    checksum = sum(ord(char) for char in pre_checksum_string) % 36
+    checksum_character = base36_encode(checksum)
+    completion_code = answered_code + unique_hash_segment + checksum_character
+    return completion_code
+
+def base36_encode(number):
+    assert number >= 0, "Number must be non-negative"
+    if number == 0:
+        return '0'
+    base36 = []
+    while number:
+        number, i = divmod(number, 36)
+        base36.append("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i])
+    return ''.join(reversed(base36))
 
 output_file_lock = Lock()
 def append_to_output_file(user_hash, sample, response):
@@ -125,28 +170,13 @@ def index():
         current_set = user['q_samples'][current_index - len(user['i_samples'])]
         is_individual = False
 
+    if current_index == total_samples - 1:
+        completion_code = get_completion_code(user_data)
+        current_set['question1'] = f"Thank you for your participation in this survey!\nYour completion code is: {completion_code}.\nPlease email this code to the researcher (skumar43@gmail.com) to receive your compensation.\nSave a record of this screen for your records."
+
     is_part_1 = current_index < len(user['i_samples'])
 
-    skipped_questions = 0
-    answered_questions = 0
-    for i_sample in user['i_samples']:
-        if i_sample.get('is_info', False):
-            continue
-        if i_sample['relevance'] == 1:
-            skipped_questions += 1
-        elif i_sample['relevance'] > 1:
-            answered_questions += 1
-    for q_sample in user['q_samples']:
-        if q_sample.get('is_info', False):
-            continue
-        if q_sample['relevance'] == 1:
-            skipped_questions += 1
-        elif q_sample['relevance'] > 1:
-            answered_questions += 1
-        if q_sample['completeness'] == 1:
-            skipped_questions += 1
-        elif q_sample['completeness'] > 1:
-            answered_questions += 1
+    skipped_questions, answered_questions = count_skipped_questions(user)
     
     # print(f"Current index: {current_index}, Rendering sample_set: {current_set}")
     # print(f"Skipped questions: {skipped_questions}, Answered questions: {answered_questions}")

@@ -63,8 +63,8 @@ def load_and_update_samples(jsonl_file, sample_count, select_lowest=True):
 
     return selected_samples
 
-# genSamples()
-# print("Done generating samples")
+genSamples()
+print("Done generating samples")
 i_samples_selected = load_and_update_samples('i_samples.jsonl', 100, select_lowest=True)
 q_samples_selected = load_and_update_samples('q_samples.jsonl', 1, select_lowest=True)
 
