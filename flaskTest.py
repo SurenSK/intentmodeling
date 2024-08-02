@@ -1,84 +1,65 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for
 import random
 import json
 import hashlib
 from datetime import datetime, timedelta, timezone
-from collections import defaultdict
+from threading import Lock
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'  # Replace with a real secret key
 
-def load_samples():
-    i_samples = []
-    q_samples = []
-    sample_counts = defaultdict(int)
-    
-    try:
-        with open('ga_output_filtered.jsonl', 'r') as file:
-            for line in file:
-                try:
-                    sample = json.loads(line)
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON: {e}")
-                    continue
+# In-memory storage for user-specific data
+user_data = {}
+input_file_lock = Lock()
 
-                if sample.get('survey', False) or True:
-                    q_samples.append(sample)
-                    for i in range(1, 6):
-                        question_key = f'question{i}'
-                        if question_key in sample:
-                            new_sample = {
-                                'gen#': sample['gen#'],
-                                'prompt#': sample['prompt#'],
-                                'score': sample.get('score',0),
-                                'valid': sample.get('valid', True),
-                                'prompt': sample.get('prompt', ""),
-                                'question': sample[question_key],
-                                'question_number': i
-                            }
-                            i_samples.append(new_sample)
+def load_and_update_samples(jsonl_file, sample_count, select_lowest=True):
+    with input_file_lock:
+        with open(jsonl_file, 'r') as file:
+            samples = [json.loads(line) for line in file]
 
-        try:
-            with open('sample_counts.json', 'r') as count_file:
-                sample_counts = json.load(count_file)
-        except FileNotFoundError:
-            print("sample_counts.json not found, starting with empty counts")
+        samples_sorted = sorted(samples, key=lambda x: x['count'], reverse=not select_lowest)
+        selected_samples = samples_sorted[:sample_count]
+        
+        for sample in selected_samples:
+            sample['count'] += 1
 
-    except FileNotFoundError:
-        print("ga_output.jsonl file not found")
-        raise
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        raise
+        with open(jsonl_file, 'w') as file:
+            for sample in samples:
+                file.write(json.dumps(sample) + '\n')
 
-    i_samples.sort(key=lambda x: sample_counts.get(f"{x['gen#']}_{x['prompt#']}_{x['question_number']}", 0))
-    i_samples = i_samples[:100]
+    return selected_samples
+
+def prepare_user_samples():
+    i_samples = load_and_update_samples('i_samples.jsonl', 100, select_lowest=True)
+    q_samples = load_and_update_samples('q_samples.jsonl', 1, select_lowest=True)
+    roll = q_samples[0]['roll']
+    i_samples = [sample["data"] for sample in i_samples]
+    q_samples = [sample["data"] for sample in q_samples][0]
+
     random.shuffle(i_samples)
-    random.shuffle(q_samples)
 
     i_samples.insert(0, {
         'gen#': 'info',
         'prompt#': 'intro1',
-        'question1': 'Welcome to Part 1 of the survey. In this part, you will be evaluating individual questions. Evaluate each question as if it were from an entirely separate author, without the context of the rest of the survey.',
+        'question': 'Welcome to Part 1 of the survey. In this part, you will be evaluating individual questions. Evaluate each question as if it were from an entirely separate author, without the context of the rest of the survey.',
         'is_info': True
     })
     
     q_samples.insert(0, {
         'gen#': 'info',
         'prompt#': 'intro2',
-        'question1': 'Welcome to Part 2 of the survey. In this part, you will be evaluating sets of questions jointly. Evaluate each set of questions as if it were from an entirely separate author, without the context of the rest of the survey.',
+        'question': 'Welcome to Part 2 of the survey. In this part, you will be evaluating sets of questions jointly. Evaluate each set of questions as if it were from an entirely separate author, without the context of the rest of the survey.',
         'is_info': True
     })
 
     q_samples.append({
         'gen#': 'info',
         'prompt#': 'outro',
-        'question1': 'Thank you for your participation in this survey!',
+        'question': 'Thank you for your participation in this survey!',
         'is_info': True
     })
 
-    return i_samples, q_samples, sample_counts
-
-i_samples, q_samples, sample_counts = load_samples()
+    return i_samples, q_samples, roll
 
 def get_user_hash():
     user_data = f"{request.remote_addr}{request.user_agent.string}"
@@ -89,121 +70,108 @@ def get_est_time():
     est_time = utc_time - timedelta(hours=4)
     return est_time.strftime('%Y-%B-%d %I:%M%p')
 
-def append_to_output_file(user_hash, index, response):
+output_file_lock = Lock()
+def append_to_output_file(user_hash, sample, response):
     current_time = get_est_time()
     
-    if index < len(i_samples):
-        sample = i_samples[index]
-        question_num = sample['question_number']
-    else:
-        q_index = index - len(i_samples)
-        if q_index >= len(q_samples):
-            print(f"Warning: Attempting to access q_samples out of range. Index: {q_index}, q_samples length: {len(q_samples)}")
-            return
-        sample = q_samples[q_index]
-        question_num = 0  # 0 for question sets
+    output = {
+        'date-time': current_time,
+        'user_hash': user_hash,
+        'name': user_data[user_hash]['name'],
+        'gen#': sample['gen#'],
+        'prompt#': sample['prompt#'],
+        'question#': sample.get('question_number', -1),
+        'relevance': response['relevance'],
+        'completeness': response['completeness']
+    }
     
-    with open('survey_responses.jsonl', 'a') as f:
-        output = {
-            'date-time': current_time,
-            'user_hash': user_hash,
-            'name': session['user_data'].get('name', ''),  # Add this line
-            'gen#': sample['gen#'],
-            'prompt#': sample['prompt#'],
-            'question#': question_num,
-            'relevance': response['relevance'],
-            'completeness': response['completeness']
-        }
-        json.dump(output, f)
-        f.write('\n')
-
-    sample_key = f"{sample['gen#']}_{sample['prompt#']}_{question_num}"
-    sample_counts[sample_key] = sample_counts.get(sample_key, 0) + 1
-
-    with open('sample_counts.json', 'w') as count_file:
-        json.dump(sample_counts, count_file)
+    with output_file_lock:
+        with open('survey_responses.jsonl', 'a') as f:
+            f.write(json.dumps(output) + '\n')
 
 @app.route('/')
 def index():
     user_hash = get_user_hash()
-    if 'user_data' not in session:
-        session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
-    current_index = session['user_data']['current_set_index']
+    if user_hash not in user_data:
+        i_samples, q_samples, roll = prepare_user_samples()
+        user_data[user_hash] = {
+            'current_set_index': 0,
+            'answers': {},
+            'name': '',
+            'roll': roll,
+            'i_samples': i_samples,
+            'q_samples': q_samples
+        }
 
-    total_samples = len(i_samples) + len(q_samples)
+    user = user_data[user_hash]
+    current_index = user['current_set_index']
+    total_samples = len(user['i_samples']) + len(user['q_samples'])
+
     if current_index >= total_samples:
         current_index = total_samples - 1
-        session['user_data']['current_set_index'] = current_index
+        user['current_set_index'] = current_index
 
-    if current_index < len(i_samples):
-        current_set = i_samples[current_index]
+    if current_index < len(user['i_samples']):
+        current_set = user['i_samples'][current_index]
         is_individual = True
     else:
-        current_set = q_samples[current_index - len(i_samples)]
+        current_set = user['q_samples'][current_index - len(user['i_samples'])]
         is_individual = False
 
-    is_part_1 = current_index < len(i_samples)
+    is_part_1 = current_index < len(user['i_samples'])
 
-    # Fix for both Part 1 and Part 2 intro screens
-    if current_set.get('is_info', False):
-        if 'question1' in current_set:
-            current_set['question'] = current_set['question1']
-        elif 'question' not in current_set:
-            current_set['question'] = current_set.get('question', "Welcome to the survey.")
+    print(f"Current index: {current_index}, Rendering sample_set: {current_set}")
 
     return render_template('index.html',
                            sample_set=current_set,
                            set_index=current_index + 1,
                            total_sets=total_samples,
-                           responses=session['user_data']['answers'],
+                           responses=user['answers'],
                            is_individual=is_individual,
-                           i_samples_length=len(i_samples),
+                           i_samples_length=len(user['i_samples']),
                            is_part_1=is_part_1,
-                           user_name=session['user_data'].get('name', ''))
-
+                           user_name=user['name'])
 
 @app.route('/update_name', methods=['POST'])
 def update_name():
+    user_hash = get_user_hash()
     data = request.get_json()
-    session['user_data']['name'] = data.get('name', '')
-    session.modified = True
-    return '', 204  # Return an empty response with a 204 No Content status
+    user_data[user_hash]['name'] = data.get('name', '')
+    return '', 204
 
 @app.route('/rate', methods=['POST'])
 def rate():
     user_hash = get_user_hash()
+    user = user_data[user_hash]
+    current_index = user['current_set_index']
     
-    if 'user_data' not in session:
-        session['user_data'] = {'current_set_index': 0, 'answers': {}, 'name': ''}
-
-    current_index = session['user_data']['current_set_index']
-    
-    current_sample = i_samples[current_index] if current_index < len(i_samples) else q_samples[current_index - len(i_samples)]
+    current_sample = user['i_samples'][current_index] if current_index < len(user['i_samples']) else user['q_samples'][current_index - len(user['i_samples'])]
     if not current_sample.get('is_info', False):
         current_response = {
             'relevance': request.form.get('relevance'),
             'completeness': request.form.get('completeness')
         }
-        session['user_data']['answers'][str(current_index)] = current_response
+        user['answers'][str(current_index)] = current_response
 
-        append_to_output_file(user_hash, current_index, current_response)
+        append_to_output_file(user_hash, current_sample, current_response)
 
-    total_samples = len(i_samples) + len(q_samples)
+    total_samples = len(user['i_samples']) + len(user['q_samples'])
     if 'next' in request.form and current_index < total_samples - 1:
-        session['user_data']['current_set_index'] += 1
+        user['current_set_index'] += 1
     elif 'previous' in request.form and current_index > 0:
-        session['user_data']['current_set_index'] -= 1
+        user['current_set_index'] -= 1
     elif 'skip_stage_1' in request.form:
-        session['user_data']['current_set_index'] = len(i_samples)
+        user['current_set_index'] = len(user['i_samples'])
 
-    session['user_data']['current_set_index'] = min(session['user_data']['current_set_index'], total_samples - 1)
+    user['current_set_index'] = min(user['current_set_index'], total_samples - 1)
 
-    session.modified = True
     return redirect(url_for('index'))
 
 @app.route('/reset')
 def reset():
-    session.clear()
+    user_hash = get_user_hash()
+    if user_hash in user_data:
+        del user_data[user_hash]
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
