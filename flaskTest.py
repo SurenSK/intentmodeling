@@ -171,9 +171,12 @@ def index():
         current_set = user['q_samples'][current_index - len(user['i_samples'])]
         is_individual = False
 
+    is_end = False
     if current_index == total_samples - 1:
         completion_code = get_completion_code(user_data)
         current_set['question1'] = f"Thank you for your participation in this survey!\nYour completion code is: {completion_code}.\nPlease email this code to the researcher (skumar43@gmail.com) to receive your compensation.\nSave a record of this screen for your records."
+        is_end = True
+        del user_data[user_hash]
 
     is_part_1 = current_index < len(user['i_samples'])
 
@@ -190,6 +193,7 @@ def index():
                            skips = skipped_questions,
                            i_samples_length=len(user['i_samples']),
                            is_part_1=is_part_1,
+                           is_end=is_end,
                            user_name=user['name'])
 
 @app.route('/update_name', methods=['POST'])

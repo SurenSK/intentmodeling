@@ -201,7 +201,7 @@
             </div>
             {% endif %}
             <div class="navigation">
-                <button type="submit" name="previous" {% if set_index == 1 %}disabled{% endif %}>Previous</button>
+                <button type="submit" name="previous" {% if set_index == 1 or is_end %}disabled{% endif %}>Previous</button>
                 <button type="submit" name="skip_stage_1" {% if set_index > i_samples_length %}disabled{% endif %}>Skip Stage 1</button>
                 <button type="submit" name="next" {% if set_index == total_sets %}disabled{% endif %}>Next</button>
             </div>
