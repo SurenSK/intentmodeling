@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'  # Change this to a secure random key
 
 def load_samples():
     i_samples = []
