@@ -37,6 +37,7 @@ def prepare_user_samples():
     q_samples = [sample["data"] for sample in q_samples][0]
 
     random.shuffle(i_samples)
+    random.shuffle(q_samples)
 
     i_samples.insert(0, {
         'gen#': 'info',
@@ -58,6 +59,13 @@ def prepare_user_samples():
         'question1': 'Thank you for your participation in this survey!',
         'is_info': True
     })
+
+    # for each i_sample add a field called 'relevance' with value 0
+    for i_sample in i_samples:
+        i_sample['relevance'] = 0
+    for q_sample in q_samples:
+        q_sample['relevance'] = 0
+        q_sample['completeness'] = 0
 
     return i_samples, q_samples, roll
 
@@ -96,7 +104,6 @@ def index():
         i_samples, q_samples, roll = prepare_user_samples()
         user_data[user_hash] = {
             'current_set_index': 0,
-            'answers': {},
             'name': '',
             'roll': roll,
             'i_samples': i_samples,
@@ -120,13 +127,34 @@ def index():
 
     is_part_1 = current_index < len(user['i_samples'])
 
-    print(f"Current index: {current_index}, Rendering sample_set: {current_set}")
+    skipped_questions = 0
+    answered_questions = 0
+    for i_sample in user['i_samples']:
+        if i_sample.get('is_info', False):
+            continue
+        if i_sample['relevance'] == 1:
+            skipped_questions += 1
+        elif i_sample['relevance'] > 1:
+            answered_questions += 1
+    for q_sample in user['q_samples']:
+        if q_sample.get('is_info', False):
+            continue
+        if q_sample['relevance'] == 1:
+            skipped_questions += 1
+        elif q_sample['relevance'] > 1:
+            answered_questions += 1
+        if q_sample['completeness'] == 1:
+            skipped_questions += 1
+        elif q_sample['completeness'] > 1:
+            answered_questions += 1
+    
+    # print(f"Current index: {current_index}, Rendering sample_set: {current_set}")
+    print(f"Skipped questions: {skipped_questions}, Answered questions: {answered_questions}")
 
     return render_template('index.html',
                            sample_set=current_set,
                            set_index=current_index + 1,
                            total_sets=total_samples,
-                           responses=user['answers'],
                            is_individual=is_individual,
                            i_samples_length=len(user['i_samples']),
                            is_part_1=is_part_1,
@@ -147,13 +175,14 @@ def rate():
     
     current_sample = user['i_samples'][current_index] if current_index < len(user['i_samples']) else user['q_samples'][current_index - len(user['i_samples'])]
     if not current_sample.get('is_info', False):
-        current_response = {
-            'relevance': request.form.get('relevance'),
-            'completeness': request.form.get('completeness')
-        }
-        user['answers'][str(current_index)] = current_response
-
-        append_to_output_file(user_hash, current_sample, current_response)
+        relevance = request.form.get('relevance')
+        completeness = request.form.get('completeness', 0)  # Default to 0 if not provided
+        
+        current_sample['relevance'] = int(relevance) if relevance else current_sample.get('relevance', 0)
+        if 'completeness' in current_sample:  # This check ensures it's a q_sample
+            current_sample['completeness'] = int(completeness) if completeness else current_sample.get('completeness', 0)
+        
+        append_to_output_file(user_hash, current_sample, {'relevance': relevance, 'completeness': completeness})
 
     total_samples = len(user['i_samples']) + len(user['q_samples'])
     if 'next' in request.form and current_index < total_samples - 1:
@@ -161,6 +190,8 @@ def rate():
     elif 'previous' in request.form and current_index > 0:
         user['current_set_index'] -= 1
     elif 'skip_stage_1' in request.form:
+        for i_sample in user['i_samples']:
+            i_sample['relevance'] = 1 if i_sample['relevance'] == 0 else i_sample['relevance']
         user['current_set_index'] = len(user['i_samples'])
 
     user['current_set_index'] = min(user['current_set_index'], total_samples - 1)
