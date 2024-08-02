@@ -7,3 +7,5 @@ sample_counts.json
 *.txt
 *.docx
 *.pptx
+i_samples.jsonl
+q_samples.jsonl
