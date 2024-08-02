@@ -67,6 +67,7 @@ def prepare_user_samples():
     for q_sample in q_samples:
         q_sample['relevance'] = 0
         q_sample['completeness'] = 0
+        q_sample['question_number'] = -1*roll
 
     return i_samples, q_samples, roll
 
