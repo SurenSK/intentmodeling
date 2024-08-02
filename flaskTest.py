@@ -149,13 +149,14 @@ def index():
             answered_questions += 1
     
     # print(f"Current index: {current_index}, Rendering sample_set: {current_set}")
-    print(f"Skipped questions: {skipped_questions}, Answered questions: {answered_questions}")
+    # print(f"Skipped questions: {skipped_questions}, Answered questions: {answered_questions}")
 
     return render_template('index.html',
                            sample_set=current_set,
                            set_index=current_index + 1,
                            total_sets=total_samples,
                            is_individual=is_individual,
+                           skips = skipped_questions,
                            i_samples_length=len(user['i_samples']),
                            is_part_1=is_part_1,
                            user_name=user['name'])

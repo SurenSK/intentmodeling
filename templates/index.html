@@ -210,7 +210,8 @@
         <div class="progress">
             {% set adjusted_total = total_sets - 3 %}
             {% set adjusted_current = set_index - (1 if is_part_1 else 2) %}
-            Question Set {{ adjusted_current }} of {{ adjusted_total }}
+            <p>Question Set {{ adjusted_current }} of {{ adjusted_total }}</p>
+            Skipped Questions {{ skips }}
         </div>
         {% endif %}
     </div>
