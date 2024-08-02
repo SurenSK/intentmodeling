@@ -165,9 +165,10 @@
                     <div class="slider-container">
                         <div class="slider-value" id="relevanceValue">Not at all likely</div>
                         <div class="slider-wrapper">
-                            <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('relevance', 1) }}" class="slider" id="relevanceSlider" name="relevance">
+                            <input type="range" min="1" max="7" value="{{ responses.get(set_index - 1, {}).get('relevance', 1) }}" class="slider" id="relevanceSlider" name="relevance">
                         </div>
                         <div class="slider-labels">
+                            <spam>No Answer</spam>
                             <span>Not at all likely</span>
                             <span>Slightly likely</span>
                             <span>Somewhat likely</span>
@@ -183,9 +184,10 @@
                     <div class="slider-container">
                         <div class="slider-value" id="completenessValue">Not at all likely</div>
                         <div class="slider-wrapper">
-                            <input type="range" min="1" max="6" value="{{ responses.get(set_index - 1, {}).get('completeness', 1) }}" class="slider" id="completenessSlider" name="completeness">
+                            <input type="range" min="1" max="7" value="{{ responses.get(set_index - 1, {}).get('completeness', 1) }}" class="slider" id="completenessSlider" name="completeness">
                         </div>
                         <div class="slider-labels">
+                            <spam>No Answer</spam>
                             <span>Not at all likely</span>
                             <span>Slightly likely</span>
                             <span>Somewhat likely</span>
@@ -215,6 +217,7 @@
 
     <script>
         const sliderLabels = [
+            "No Answer",
             "Not at all likely",
             "Slightly likely",
             "Somewhat likely",
