@@ -48,14 +48,14 @@ def prepare_user_samples():
     q_samples.insert(0, {
         'gen#': 'info',
         'prompt#': 'intro2',
-        'question': 'Welcome to Part 2 of the survey. In this part, you will be evaluating sets of questions jointly. Evaluate each set of questions as if it were from an entirely separate author, without the context of the rest of the survey.',
+        'question1': 'Welcome to Part 2 of the survey. In this part, you will be evaluating sets of questions jointly. Evaluate each set of questions as if it were from an entirely separate author, without the context of the rest of the survey.',
         'is_info': True
     })
 
     q_samples.append({
         'gen#': 'info',
         'prompt#': 'outro',
-        'question': 'Thank you for your participation in this survey!',
+        'question1': 'Thank you for your participation in this survey!',
         'is_info': True
     })
 
