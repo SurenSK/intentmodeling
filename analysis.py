@@ -88,7 +88,7 @@ def calculate_icc(data):
             print("ICC calculation resulted in empty DataFrame. Check your input data.")
             return None
         
-        return icc.loc[icc['Type'] == 'ICC2', 'ICC'].values[0]
+        return round(icc.loc[icc['Type'] == 'ICC2', 'ICC'].values[0],2)
     except Exception as e:
         print(f"Error in calculate_icc: {str(e)}")
         print("Data shape:", data.shape)
@@ -110,7 +110,7 @@ def calculate_krippendorff_alpha(data):
         if not any(reliability_data):
             print("No valid data for Krippendorff's alpha calculation. Check your input data.")
             return None
-        return alpha(reliability_data=reliability_data, level_of_measurement='ordinal')
+        return round(alpha(reliability_data=reliability_data, level_of_measurement='ordinal'),2)
     except Exception as e:
         print(f"Error in calculate_krippendorff_alpha: {str(e)}")
         print("Data shape:", data.shape)
@@ -248,6 +248,9 @@ for user, values in part1_o.items():
     print(f"User: {user}, Slope Relevance-1: {get_slope(values)*100:.2f}")
 for user, values in part2_o.items():
     print(f"User: {user}, Slope Relevance-2: {get_slope(values['relevance'])*70:.2f}, Slope Completeness: {get_slope(values['completeness'])*70:.2f}")
+
+# plot 86197311ce1799728078c2db8f74d1b1
+plot_trends(part1_o['1b128c7f49d5cd55d4a1f221d24b0269'], part2_o['1b128c7f49d5cd55d4a1f221d24b0269']['relevance'], part2_o['1b128c7f49d5cd55d4a1f221d24b0269']['completeness'])
 
 # Analyze agreement
 results = analyze_agreement(part1_dicts, part2_dicts)
