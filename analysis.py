@@ -82,7 +82,7 @@ def calculate_icc(data):
             print("No valid data for ICC calculation after removing NaN values.")
             return None
         
-        icc = intraclass_corr(data=melted_data, targets='targets', raters='raters', ratings='ratings')
+        icc = intraclass_corr(data=melted_data, targets='targets', raters='raters', ratings='ratings', nan_policy='omit')
         
         if icc.empty:
             print("ICC calculation resulted in empty DataFrame. Check your input data.")
@@ -151,6 +151,14 @@ def analyze_agreement(part1_dicts, part2_dicts):
     except Exception as e:
         print(f"Error in analyze_agreement: {str(e)}")
         raise
+
+import numpy as np
+
+def get_slope(y_values):
+    x_values = np.arange(len(y_values))
+    slope, intercept = np.polyfit(x_values, y_values, 1)
+    return slope
+
 
 import matplotlib.pyplot as plt
 
@@ -234,6 +242,12 @@ def load_mixed_data(file_path):
 # Load mixed data
 file_path = 'survey_responses.jsonl'
 part1_dicts, part2_dicts, part1_o, part2_o = load_mixed_data(file_path)
+
+# print slopes
+for user, values in part1_o.items():
+    print(f"User: {user}, Slope Relevance-1: {get_slope(values)*100:.2f}")
+for user, values in part2_o.items():
+    print(f"User: {user}, Slope Relevance-2: {get_slope(values['relevance'])*70:.2f}, Slope Completeness: {get_slope(values['completeness'])*70:.2f}")
 
 # Analyze agreement
 results = analyze_agreement(part1_dicts, part2_dicts)
