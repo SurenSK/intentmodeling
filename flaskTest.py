@@ -214,8 +214,8 @@ def index():
         current_set['question1'] = f"Thank you for your participation in this survey!\nYour completion code is: {completion_code}.\nPlease email this code to the researcher (skumar43@gmail.com) to receive your compensation.\nSave a record of this screen for your records."
         is_end = True
         # Remove the user's data from the database since the survey is complete
-        # db.session.delete(user)
-        # db.session.commit()
+        db.session.delete(user)
+        db.session.commit()
 
     is_part_1 = current_index < len(user_data['i_samples'])
 
