@@ -91,11 +91,11 @@ def calculate_icc(data):
         return round(icc.loc[icc['Type'] == 'ICC2', 'ICC'].values[0],2)
     except Exception as e:
         print(f"Error in calculate_icc: {str(e)}")
-        print("Data shape:", data.shape)
-        print("Data info:")
-        print(data.info())
-        print("Data head:")
-        print(data.head())
+        # print("Data shape:", data.shape)
+        # print("Data info:")
+        # print(data.info())
+        # print("Data head:")
+        # print(data.head())
         return None
 
 def calculate_krippendorff_alpha(data):
@@ -113,11 +113,11 @@ def calculate_krippendorff_alpha(data):
         return round(alpha(reliability_data=reliability_data, level_of_measurement='ordinal'),2)
     except Exception as e:
         print(f"Error in calculate_krippendorff_alpha: {str(e)}")
-        print("Data shape:", data.shape)
-        print("Data info:")
-        print(data.info())
-        print("Data head:")
-        print(data.head())
+        # print("Data shape:", data.shape)
+        # print("Data info:")
+        # print(data.info())
+        # print("Data head:")
+        # print(data.head())
         return None
 
 def analyze_agreement(part1_dicts, part2_dicts):
@@ -206,6 +206,7 @@ def load_mixed_data(file_path):
     part2_data = defaultdict(lambda: defaultdict(tuple))
     part1_ordered = defaultdict(list)
     part2_ordered = defaultdict(lambda: {"relevance": [], "completeness": []})
+    gen_data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     
     with open(file_path, 'r') as file:
         lineNum = 0
@@ -218,17 +219,26 @@ def load_mixed_data(file_path):
             question_num = int(entry['question#'])
             relevance = int(entry['relevance'])
             completeness = entry['completeness']
+            gen_num = int(entry['gen#'])
+
+            prompt_key = f"{gen_num}_{prompt_num}"
+
+            if user_hash == "a930044b0bcc33fc743ab236ebdf3c52":
+                continue
             
             if completeness == 0 and 1 <= question_num <= 5:
                 # This is a Part 1 entry
-                part1_data[user_hash][prompt_num][question_num - 1] = relevance
-                part1_ordered[user_hash].append(relevance)
+                part1_data[user_hash][prompt_key][question_num - 1] = relevance-1
+                part1_ordered[user_hash].append(relevance-1)
+                gen_data[user_hash]['part1'][gen_num].append(relevance-1)
                 parseNum += 1
-            elif completeness != 0 and question_num < 0:
+            elif completeness != 0 and question_num < 1:
                 # This is a Part 2 entry
-                part2_data[user_hash][prompt_num] = (relevance, int(completeness))
-                part2_ordered[user_hash]["relevance"].append(relevance)
-                part2_ordered[user_hash]["completeness"].append(int(completeness))
+                part2_data[user_hash][prompt_key] = (relevance, int(completeness)-1)
+                part2_ordered[user_hash]["relevance"].append(relevance-1)
+                part2_ordered[user_hash]["completeness"].append(int(completeness)-1)
+                gen_data[user_hash]['part2_relevance'][gen_num].append(relevance-1)
+                gen_data[user_hash]['part2_completeness'][gen_num].append(int(completeness)-1)
                 parseNum += 1
     
     print(f"Loaded {parseNum} entries from {lineNum} lines.")
@@ -237,11 +247,40 @@ def load_mixed_data(file_path):
     part1_list = [dict(user_data) for user_data in part1_data.values()]
     part2_list = [dict(user_data) for user_data in part2_data.values()]
     
-    return part1_list, part2_list, part1_ordered, part2_ordered
+    return part1_list, part2_list, part1_ordered, part2_ordered, gen_data
+
+def calculate_gen_averages(gen_data):
+    averages = {
+        'part1': defaultdict(list),
+        'part2_relevance': defaultdict(list),
+        'part2_completeness': defaultdict(list)
+    }
+    
+    for user, user_data in gen_data.items():
+        for part in ['part1', 'part2_relevance', 'part2_completeness']:
+            for gen, scores in user_data[part].items():
+                if scores:  # Check if the list is not empty
+                    averages[part][gen].append(np.mean(scores))
+    
+    result = {}
+    for part in averages:
+        result[part] = {gen: np.mean(scores) for gen, scores in averages[part].items()}
+    
+    return result
+
+def print_gen_averages(gen_averages):
+    print("Average scores grouped by gen#:")
+    for part in ['part1', 'part2_relevance', 'part2_completeness']:
+        print(f"\n{part.capitalize().replace('_', ' ')}:")
+        for gen, avg in sorted(gen_averages[part].items()):
+            print(f"  Gen {gen}: {avg:.2f}")
 
 # Load mixed data
 file_path = 'survey_responses.jsonl'
-part1_dicts, part2_dicts, part1_o, part2_o = load_mixed_data(file_path)
+part1_dicts, part2_dicts, part1_o, part2_o, gen_data = load_mixed_data(file_path)
+
+gen_averages = calculate_gen_averages(gen_data)
+print_gen_averages(gen_averages)
 
 # print slopes
 for user, values in part1_o.items():
@@ -250,7 +289,9 @@ for user, values in part2_o.items():
     print(f"User: {user}, Slope Relevance-2: {get_slope(values['relevance'])*70:.2f}, Slope Completeness: {get_slope(values['completeness'])*70:.2f}")
 
 # plot 86197311ce1799728078c2db8f74d1b1
-plot_trends(part1_o['1b128c7f49d5cd55d4a1f221d24b0269'], part2_o['1b128c7f49d5cd55d4a1f221d24b0269']['relevance'], part2_o['1b128c7f49d5cd55d4a1f221d24b0269']['completeness'])
+plot_trends(part1_o['c31e3e51cfffd7ed82e05548fc5c7da0'], part2_o['c31e3e51cfffd7ed82e05548fc5c7da0']['relevance'], part2_o['c31e3e51cfffd7ed82e05548fc5c7da0']['completeness'])
+
+# LEARNING BIAS 
 
 # Analyze agreement
 results = analyze_agreement(part1_dicts, part2_dicts)
