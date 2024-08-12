@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 import random
 import json
 import hashlib
@@ -11,6 +11,7 @@ from sqlalchemy.orm.attributes import flag_modified
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///surveydata.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.secret_key = 'key'
 db = SQLAlchemy(app)
 
 class UserData(db.Model):
@@ -100,8 +101,11 @@ def prepare_user_samples():
     return i_samples, q_samples, roll
 
 def get_user_hash():
-    user_data = f"{request.remote_addr}{request.user_agent.string}"
-    return hashlib.md5(user_data.encode()).hexdigest()
+    if 'user_hash' not in session:
+        user_data = f"{request.remote_addr}-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        user_hash = hashlib.md5(user_data.encode()).hexdigest()
+        session['user_hash'] = user_hash
+    return session['user_hash']
 
 def get_est_time():
     utc_time = datetime.now(timezone.utc)
@@ -303,6 +307,7 @@ def reset():
         # Delete the user data from the database
         db.session.delete(user)
         db.session.commit()
+    session.clear()
     return redirect(url_for('index'))
 
 
