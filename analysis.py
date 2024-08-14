@@ -155,8 +155,12 @@ def analyze_agreement(part1_dicts, part2_dicts):
 import numpy as np
 
 def get_slope(y_values):
-    x_values = np.arange(len(y_values))
-    slope, intercept = np.polyfit(x_values, y_values, 1)
+    try:
+        x_values = np.arange(len(y_values))
+        slope, intercept = np.polyfit(x_values, y_values, 1)
+    except Exception as e:
+        print(f"Error in get_slope: {str(e)}")
+        slope = 0
     return slope
 
 
@@ -284,9 +288,9 @@ print_gen_averages(gen_averages)
 
 # print slopes
 for user, values in part1_o.items():
-    print(f"User: {user}, Slope Relevance-1: {get_slope(values)*100:.2f}")
+    print(f"User: {user}, {len(values)}, Slope Relevance-1: {get_slope(values)*100:.2f}")
 for user, values in part2_o.items():
-    print(f"User: {user}, Slope Relevance-2: {get_slope(values['relevance'])*70:.2f}, Slope Completeness: {get_slope(values['completeness'])*70:.2f}")
+    print(f"User: {user}, {len(values['relevance'])}, Slope Relevance-2: {get_slope(values['relevance'])*70:.2f}, Slope Completeness: {get_slope(values['completeness'])*70:.2f}")
 
 # plot 86197311ce1799728078c2db8f74d1b1
 plot_trends(part1_o['c31e3e51cfffd7ed82e05548fc5c7da0'], part2_o['c31e3e51cfffd7ed82e05548fc5c7da0']['relevance'], part2_o['c31e3e51cfffd7ed82e05548fc5c7da0']['completeness'])

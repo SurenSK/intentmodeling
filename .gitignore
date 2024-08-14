@@ -7,6 +7,7 @@ sample_counts.json
 *.txt
 *.docx
 *.pptx
+*.xlsx
 i_samples.jsonl
 q_samples.jsonl
 /instance/
