@@ -217,6 +217,7 @@ def load_mixed_data(file_path):
         parseNum = 0
         for line in file:
             lineNum += 1
+            date = json.loads(line)['date-time']
             entry = json.loads(line)
             user_hash = entry['user_hash']
             prompt_num = int(entry['prompt#'])
@@ -227,8 +228,14 @@ def load_mixed_data(file_path):
 
             prompt_key = f"{gen_num}_{prompt_num}"
 
-            if user_hash == "a930044b0bcc33fc743ab236ebdf3c52":
-                continue
+            # if user_hash == "a930044b0bcc33fc743ab236ebdf3c52":
+            #     continue
+
+            if user_hash == "c1c476a501fb613dcd32ff7a55cdcae4" or user_hash=="a930044b0bcc33fc743ab236ebdf3c52":
+                # print(user_hash)
+                date = date.split(" ")[0]
+                user_hash += date[-2:]
+                # print(user_hash)
             
             if completeness == 0 and 1 <= question_num <= 5:
                 # This is a Part 1 entry
@@ -246,12 +253,7 @@ def load_mixed_data(file_path):
                 parseNum += 1
     
     print(f"Loaded {parseNum} entries from {lineNum} lines.")
-    
-    # Convert dict of dicts to list of dicts
-    part1_list = [dict(user_data) for user_data in part1_data.values()]
-    part2_list = [dict(user_data) for user_data in part2_data.values()]
-    
-    return part1_list, part2_list, part1_ordered, part2_ordered, gen_data
+    return part1_data, part2_data, part1_ordered, part2_ordered, gen_data
 
 def calculate_gen_averages(gen_data):
     averages = {
@@ -279,23 +281,70 @@ def print_gen_averages(gen_averages):
         for gen, avg in sorted(gen_averages[part].items()):
             print(f"  Gen {gen}: {avg:.2f}")
 
+def post_process(a, b):
+    # Convert dict of dicts to list of dicts
+    part1_list = [dict(user_data) for user_data in a.values()]
+    part2_list = [dict(user_data) for user_data in b.values()]
+    return part1_list, part2_list
+
 # Load mixed data
 file_path = 'survey_responses.jsonl'
-part1_dicts, part2_dicts, part1_o, part2_o, gen_data = load_mixed_data(file_path)
+part1_data, part2_data, part1_o, part2_o, gen_data = load_mixed_data(file_path)
+
+
+valids = []
+for k in part2_data.keys():
+    if len(part2_data[k]) > 65:
+        valids.append(k)
+
+# remove invalid data from part1_data and part2_data
+part1_data = {k: v for k, v in part1_data.items() if k in valids}
+part2_data = {k: v for k, v in part2_data.items() if k in valids}
+part1_dicts, part2_dicts = post_process(part1_data, part2_data)
+
+valid_data = {}
+questions = {}
+for k in part2_data[valids[0]].keys():
+    questions[k] = [[], []]
+for i,a in enumerate(valids):
+    part1=sum(list(part1_data[a].values()),[])
+    part2=part2_data[a]
+    print(a, len(part1), len(part2))
+    user = a
+    for k in part1_data[a].keys():
+        questions[k][0].extend(part1_data[a][k])
+    for k in part2_data[a].keys():
+        questions[k][1].append(part2_data[a][k][0])
+
+    values1 = part1_o[user]
+    values2 = part2_o[user]
+    print(f"Sensitization Relevance-1: {get_slope(values1)*100:.2f} Relevance-2: {get_slope(values2['relevance'])*70:.2f} Completeness: {get_slope(values2['completeness'])*70:.2f}")
+
+def avg(l, k=1):
+    l = [0 if x is None else x for x in l]
+    return round(sum(l)/len(l),k)
+def var(l, k=1):
+    mean = avg(l)
+    return round(sum((x - mean) ** 2 for x in l) / len(l),k)
+gens=defaultdict(list)
+for k in questions:
+    indScore = avg(questions[k][0])
+    setScore = avg(questions[k][1])
+    gen=k.split("_")[0]
+    gens[gen].append(setScore / indScore)
+    print(k, indScore, setScore)
+for g in ["0", "1", "2", "4"]:
+    genScores = gens[g]
+    print(avg(genScores, 2), var(genScores, 2))
 
 gen_averages = calculate_gen_averages(gen_data)
 print_gen_averages(gen_averages)
 
-# print slopes
-for user, values in part1_o.items():
-    print(f"User: {user}, {len(values)}, Slope Relevance-1: {get_slope(values)*100:.2f}")
-for user, values in part2_o.items():
-    print(f"User: {user}, {len(values['relevance'])}, Slope Relevance-2: {get_slope(values['relevance'])*70:.2f}, Slope Completeness: {get_slope(values['completeness'])*70:.2f}")
-
-# plot 86197311ce1799728078c2db8f74d1b1
-plot_trends(part1_o['c31e3e51cfffd7ed82e05548fc5c7da0'], part2_o['c31e3e51cfffd7ed82e05548fc5c7da0']['relevance'], part2_o['c31e3e51cfffd7ed82e05548fc5c7da0']['completeness'])
-
-# LEARNING BIAS 
+# # print slopes
+# for user, values in part1_o.items():
+#     print(f"User: {user}, {len(values)}, Slope Relevance-1: {get_slope(values)*100:.2f}")
+# for user, values in part2_o.items():
+#     print(f"User: {user}, {len(values['relevance'])}, Slope Relevance-2: {get_slope(values['relevance'])*70:.2f}, Slope Completeness: {get_slope(values['completeness'])*70:.2f}")
 
 # Analyze agreement
 results = analyze_agreement(part1_dicts, part2_dicts)

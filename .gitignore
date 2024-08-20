@@ -11,3 +11,5 @@ sample_counts.json
 i_samples.jsonl
 q_samples.jsonl
 /instance/
+data_r.csv
+output.png
