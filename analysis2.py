@@ -276,38 +276,52 @@ for p in Person.validParticipants:
     data.extend([[agreement] + ["_".join(item[0].split("_")[:2])] + [item[1]] for item in p.dedup_ordered_answers_1])
 # Extract x, y, and labels from the data
 data = sorted(data, key=lambda x: int(x[1].split('_')[0]), reverse=True)
-x_values = [item[1] for item in data]
-y_values = [item[2] for item in data]
-labels = [item[0] for item in data]
+data = [[item[0], item[1], item[2] - 1] for item in data if item[2] != 1]
 
-# Create a color map
-colors = {'A': 'red', 'B': 'green'}
-color_values = [colors[label] for label in labels]
+# Convert the data list to a DataFrame
+df = pd.DataFrame(data, columns=['Agreement', 'Question', 'Rating'])
 
-# Jittering y-values
-jitter_strength = 0.05
-y_values_jittered = [y + np.random.uniform(-jitter_strength, jitter_strength) for y in y_values]
+# Prepare the data for a boxplot
+df_sorted = df.sort_values(by='Question')
+# Extract generation number from the 'Question' field
+df_sorted['Generation'] = df_sorted['Question'].apply(lambda x: x.split('_')[0])
 
-# Plotting with jittered y-values and vertical y-axis labels
-plt.figure(figsize=(10, 6))
-scatter = plt.scatter(x_values, y_values_jittered, c=color_values, alpha=0.6)
+# Group by Agreement and Generation and calculate the average rating
+average_ratings = df_sorted.groupby(['Agreement', 'Generation']).mean().reset_index()
 
-# Adding vertical y-axis labels and rotating x-ticks for better readability
-plt.yticks(np.arange(1, 8), rotation='vertical')
+import seaborn as sns
+# Creating a boxplot
+plt.figure(figsize=(12, 8))
+boxplot = sns.boxplot(x='Question', y='Rating', hue='Agreement', data=df_sorted, palette=['#ff9999', '#99ff99'])
 plt.xticks(rotation=90)
-
-# Add labels and title
+plt.title('Survey Ratings by Question and Agreement Type')
 plt.xlabel('Question')
 plt.ylabel('Rating')
-plt.title('Survey Ratings')
+plt.legend(title='Cluster', loc='upper left', bbox_to_anchor=(1.05, 1))
 
-# Create a legend
-plt.legend(handles=scatter.legend_elements()[0], labels=colors.keys())
+cluster_averages = [4.5, 3.2, 4.8, 3.7]  # Placeholder values
+other_cluster_averages = [4.1, 3.5, 4.2, 3.8]  # Placeholder values
+colors = ['#ff9999', '#99ff99']  # Colors used in the boxplot
+partition_indices = [19, 38, 60, 70]
+for i, avg in enumerate(cluster_averages):
+    start_idx = 0 if i == 0 else partition_indices[i-1]
+    end_idx = partition_indices[i]
+    plt.hlines(y=avg, xmin=start_idx - 0.5, xmax=end_idx - 0.5, colors='black', linestyles='-', linewidth=3)
+    plt.hlines(y=avg, xmin=start_idx - 0.5, xmax=end_idx - 0.5, colors=colors[0], linestyles='-', linewidth=2)
 
-plt.grid(True)
-plt.tight_layout()
+for i, avg in enumerate(other_cluster_averages):
+    start_idx = 0 if i == 0 else partition_indices[i-1]
+    end_idx = partition_indices[i]
+    plt.hlines(y=avg, xmin=start_idx - 0.5, xmax=end_idx - 0.5, colors='black', linestyles='-', linewidth=3)
+    plt.hlines(y=avg, xmin=start_idx - 0.5, xmax=end_idx - 0.5, colors=colors[1], linestyles='-', linewidth=2)
+
+partition_indices = [19, 38, 60]
+# Manually add the partition lines (insert indices in the list below)
+for idx in partition_indices:  # Update these indices to match your data
+    plt.axvline(x=idx - 0.5, color='black', linewidth=2, linestyle='-')
+
+plt.xlim(left=-0.5, right=len(df_sorted['Question'].unique()) - 0.5)
 plt.show()
-
 
 a=participants["c1c476a501fb613dcd32ff7a55cdcae412"]
 print("Done")
