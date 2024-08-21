@@ -49,7 +49,7 @@ class Person:
         self.part1_normalized_r = normalize([x[1] for x in self.dedup_ordered_answers_1], self.part1_slope) if self.part1_slope else None
         self.part2_normalized_r = normalize([x[1] for x in self.dedup_ordered_answers_2], self.part2_r_slope) if self.part2_r_slope else None
         self.part2_normalized_c = normalize([x[2] for x in self.dedup_ordered_answers_2], self.part2_c_slope) if self.part2_c_slope else None
-        self.valid = self.part2_normalized_r and len(self.part2_normalized_r)>65 and self.user_hash not in outlierHashes and self.quiz_duration>=15
+        self.valid = self.part2_normalized_r and len(self.part2_normalized_r)>65 and self.user_hash not in outlierHashes
         if self.valid:
             Person.validParticipants.append(self)
             self.keys_1 = [x[0] for x in self.dedup_ordered_answers_1]
@@ -271,8 +271,11 @@ for ptypes in thsdSlices:
     results = tukey.summary().data[1:]  # Skip the header row
 
 data = []
+classes = ["Anti-Optimization (17)", "Pro-Optimization (31)"]
+classes = ["Uncorrelated RC (15)", "Correlated RC (33)"]
 for p in Person.validParticipants:
-    agreement = "A" if p.orderType == "S10E" or p.orderType == "S00E" else "B"
+    agreement = classes[0] if p.orderType == "S10E" or p.orderType == "S00E" else classes[1]
+    agreement = classes[0] if p.rc_corr>0.8 else classes[1]
     data.extend([[agreement] + ["_".join(item[0].split("_")[:2])] + [item[1]] for item in p.dedup_ordered_answers_1])
 # Extract x, y, and labels from the data
 data = sorted(data, key=lambda x: int(x[1].split('_')[0]), reverse=True)
@@ -294,13 +297,16 @@ import seaborn as sns
 plt.figure(figsize=(12, 8))
 boxplot = sns.boxplot(x='Question', y='Rating', hue='Agreement', data=df_sorted, palette=['#ff9999', '#99ff99'])
 plt.xticks(rotation=90)
-plt.title('Survey Ratings by Question and Agreement Type')
+plt.title('Survey Ratings by Question and RC Correlation')
 plt.xlabel('Question')
 plt.ylabel('Rating')
-plt.legend(title='Cluster', loc='upper left', bbox_to_anchor=(1.05, 1))
+plt.legend(title='Cluster', loc='upper left', bbox_to_anchor=(1, 1))
 
 cluster_averages = [4.5, 3.2, 4.8, 3.7]  # Placeholder values
 other_cluster_averages = [4.1, 3.5, 4.2, 3.8]  # Placeholder values
+cluster_averages = average_ratings[average_ratings['Agreement'] == classes[0]]['Rating'].tolist()
+other_cluster_averages = average_ratings[average_ratings['Agreement'] == classes[1]]['Rating'].tolist()
+
 colors = ['#ff9999', '#99ff99']  # Colors used in the boxplot
 partition_indices = [19, 38, 60, 70]
 for i, avg in enumerate(cluster_averages):
@@ -319,7 +325,7 @@ partition_indices = [19, 38, 60]
 # Manually add the partition lines (insert indices in the list below)
 for idx in partition_indices:  # Update these indices to match your data
     plt.axvline(x=idx - 0.5, color='black', linewidth=2, linestyle='-')
-
+plt.subplots_adjust(left=0.05, right=0.85)
 plt.xlim(left=-0.5, right=len(df_sorted['Question'].unique()) - 0.5)
 plt.show()
 
